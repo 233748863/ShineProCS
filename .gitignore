@@ -6,8 +6,9 @@ obj/
 x64/
 x86/
 
-# Visual Studio
+# Visual Studio / VS Code
 .vs/
+.vscode/
 *.user
 *.suo
 *.userosscache
