@@ -1,0 +1,30 @@
+<Window x:Class="ShineProCS.Views.KeyCaptureWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.modernwpf.com/2019"
+        Title="按键捕获" Width="320" Height="220"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        ui:WindowHelper.UseModernWindowStyle="True"
+        Background="{DynamicResource SystemControlPageBackgroundAltHighBrush}"
+        KeyDown="Window_KeyDown">
+    
+    <Grid Margin="20">
+        <StackPanel VerticalAlignment="Center">
+            <TextBlock Text="请按下要绑定的按键" FontSize="16" FontWeight="SemiBold" 
+                       HorizontalAlignment="Center" Margin="0,0,0,16"/>
+            
+            <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" 
+                    CornerRadius="8" Padding="20,16" Margin="0,0,0,20">
+                <TextBlock x:Name="KeyDisplay" Text="等待按键..." FontSize="24" FontWeight="Bold"
+                           HorizontalAlignment="Center" Foreground="{DynamicResource SystemControlHighlightAccentBrush}"/>
+            </Border>
+            
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                <Button Content="确定" Width="80" Height="32" Margin="0,0,8,0" Click="Confirm_Click" 
+                        Style="{DynamicResource AccentButtonStyle}" IsEnabled="False" x:Name="ConfirmBtn"/>
+                <Button Content="取消" Width="80" Height="32" Click="Cancel_Click"/>
+            </StackPanel>
+        </StackPanel>
+    </Grid>
+</Window>

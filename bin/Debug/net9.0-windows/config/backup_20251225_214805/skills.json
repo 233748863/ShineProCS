@@ -1,0 +1,228 @@
+[
+  {
+    "Name": "青川濯莲",
+    "KeyCode": 49,
+    "Priority": 100,
+    "Enabled": true,
+    "IconRegion": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "TemplatePath": "",
+    "SimilarityThreshold": 0.8,
+    "MinHp": 0,
+    "MinMp": 0,
+    "RequireTarget": false,
+    "Cooldown": 0,
+    "BuffRequirements": [],
+    "PreCastKeyCode": 0,
+    "PreCastConditionBuff": "",
+    "ComboDelay": 100
+  },
+  {
+    "Name": "逐云寒蕊",
+    "KeyCode": 51,
+    "Priority": 90,
+    "Enabled": true,
+    "IconRegion": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "TemplatePath": "",
+    "SimilarityThreshold": 0.8,
+    "MinHp": 0,
+    "MinMp": 0,
+    "RequireTarget": false,
+    "Cooldown": 0,
+    "BuffRequirements": [],
+    "PreCastKeyCode": 0,
+    "PreCastConditionBuff": "",
+    "ComboDelay": 100
+  },
+  {
+    "Name": "当归四逆",
+    "KeyCode": 69,
+    "Priority": 80,
+    "Enabled": true,
+    "IconRegion": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "TemplatePath": "",
+    "SimilarityThreshold": 0.8,
+    "MinHp": 0,
+    "MinMp": 0,
+    "RequireTarget": false,
+    "Cooldown": 0,
+    "BuffRequirements": [],
+    "PreCastKeyCode": 0,
+    "PreCastConditionBuff": "",
+    "ComboDelay": 100
+  },
+  {
+    "Name": "银光照雪",
+    "KeyCode": 52,
+    "Priority": 70,
+    "Enabled": true,
+    "IconRegion": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "TemplatePath": "",
+    "SimilarityThreshold": 0.8,
+    "MinHp": 0,
+    "MinMp": 0,
+    "RequireTarget": false,
+    "Cooldown": 0,
+    "BuffRequirements": [],
+    "PreCastKeyCode": 0,
+    "PreCastConditionBuff": "",
+    "ComboDelay": 100
+  },
+  {
+    "Name": "赤芍寒香",
+    "KeyCode": 81,
+    "Priority": 60,
+    "Enabled": true,
+    "IconRegion": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "TemplatePath": "",
+    "SimilarityThreshold": 0.8,
+    "MinHp": 0,
+    "MinMp": 30,
+    "RequireTarget": false,
+    "Cooldown": 0,
+    "BuffRequirements": [
+      {
+        "Name": "千枝态",
+        "IconRegion": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "TemplatePath": "",
+        "SimilarityThreshold": 0.8,
+        "IsDebuff": false,
+        "IsRequired": true
+      }
+    ],
+    "PreCastKeyCode": 87,
+    "PreCastConditionBuff": "千枝态",
+    "ComboDelay": 150
+  },
+  {
+    "Name": "绿野蔓生",
+    "KeyCode": 53,
+    "Priority": 50,
+    "Enabled": true,
+    "IconRegion": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "TemplatePath": "",
+    "SimilarityThreshold": 0.8,
+    "MinHp": 0,
+    "MinMp": 0,
+    "RequireTarget": false,
+    "Cooldown": 0,
+    "BuffRequirements": [],
+    "PreCastKeyCode": 0,
+    "PreCastConditionBuff": "",
+    "ComboDelay": 100
+  },
+  {
+    "Name": "白芷含芳",
+    "KeyCode": 54,
+    "Priority": 40,
+    "Enabled": true,
+    "IconRegion": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "TemplatePath": "",
+    "SimilarityThreshold": 0.8,
+    "MinHp": 0,
+    "MinMp": 0,
+    "RequireTarget": false,
+    "Cooldown": 0,
+    "BuffRequirements": [],
+    "PreCastKeyCode": 0,
+    "PreCastConditionBuff": "",
+    "ComboDelay": 100
+  },
+  {
+    "Name": "七情和合",
+    "KeyCode": 50,
+    "Priority": 30,
+    "Enabled": true,
+    "IconRegion": [
+      1228,
+      537,
+      115,
+      63
+    ],
+    "TemplatePath": "",
+    "SimilarityThreshold": 0.8,
+    "MinHp": 0,
+    "MinMp": 30,
+    "RequireTarget": false,
+    "Cooldown": 0,
+    "BuffRequirements": [
+      {
+        "Name": "七情态",
+        "IconRegion": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "TemplatePath": "",
+        "SimilarityThreshold": 0.8,
+        "IsDebuff": false,
+        "IsRequired": false
+      }
+    ],
+    "PreCastKeyCode": 0,
+    "PreCastConditionBuff": "",
+    "ComboDelay": 100
+  },
+  {
+    "Name": "千枝绽蕊",
+    "KeyCode": 87,
+    "Priority": 10,
+    "Enabled": false,
+    "IconRegion": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "TemplatePath": "",
+    "SimilarityThreshold": 0.8,
+    "MinHp": 0,
+    "MinMp": 30,
+    "RequireTarget": false,
+    "Cooldown": 0,
+    "BuffRequirements": [],
+    "PreCastKeyCode": 0,
+    "PreCastConditionBuff": "",
+    "ComboDelay": 100
+  }
+]

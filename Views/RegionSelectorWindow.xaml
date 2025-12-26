@@ -1,0 +1,20 @@
+<Window x:Class="ShineProCS.Views.RegionSelectorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="框选区域 (ESC取消)" WindowStyle="None" AllowsTransparency="True" Background="#33000000"
+        Topmost="True" Cursor="Cross" WindowStartupLocation="Manual">
+    <Grid>
+        <Canvas x:Name="SelectionCanvas" Background="Transparent" 
+                MouseDown="Canvas_MouseDown" MouseMove="Canvas_MouseMove" MouseUp="Canvas_MouseUp">
+            <Border x:Name="SelectionBorder" BorderBrush="#FF4CC2FF" BorderThickness="2" Background="#334CC2FF" Visibility="Collapsed"/>
+        </Canvas>
+        <TextBlock Text="拖拽框选区域，ESC取消" Foreground="White" FontSize="16" FontWeight="Bold"
+                   HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,20,0,0">
+            <TextBlock.Effect><DropShadowEffect Color="Black" BlurRadius="5" ShadowDepth="2"/></TextBlock.Effect>
+        </TextBlock>
+        <TextBlock x:Name="CoordText" Foreground="Yellow" FontSize="14" FontFamily="Consolas"
+                   HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="10,0,0,10">
+            <TextBlock.Effect><DropShadowEffect Color="Black" BlurRadius="3" ShadowDepth="1"/></TextBlock.Effect>
+        </TextBlock>
+    </Grid>
+</Window>

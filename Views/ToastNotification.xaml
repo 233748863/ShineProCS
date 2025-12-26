@@ -1,0 +1,37 @@
+<Window x:Class="ShineProCS.Views.ToastNotification"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Toast" 
+        SizeToContent="WidthAndHeight"
+        MaxWidth="350"
+        WindowStyle="None" 
+        AllowsTransparency="True"
+        Background="Transparent"
+        Topmost="True"
+        ShowInTaskbar="False"
+        ResizeMode="NoResize"
+        WindowStartupLocation="Manual">
+    
+    <Border x:Name="ToastBorder" CornerRadius="8" Padding="16,12" Margin="8" MinWidth="280">
+        <Border.RenderTransform>
+            <TranslateTransform x:Name="SlideTransform"/>
+        </Border.RenderTransform>
+        <Border.Effect>
+            <DropShadowEffect Color="Black" BlurRadius="15" ShadowDepth="2" Opacity="0.4"/>
+        </Border.Effect>
+        
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            
+            <TextBlock x:Name="IconText" Text="ℹ️" FontSize="20" VerticalAlignment="Center" Margin="0,0,12,0"/>
+            
+            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                <TextBlock x:Name="TitleText" Text="通知" FontWeight="Bold" Foreground="White" FontSize="14"/>
+                <TextBlock x:Name="MessageText" Text="" Foreground="#DDD" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0" MaxWidth="260"/>
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>
