@@ -35,12 +35,40 @@ public class ConfigManager
         _skillsPath = Path.Combine(_configPath, "skills.json");
         
         EnsureConfigDirectory();
+        EnsureDefaultConfigs();
     }
 
     private void EnsureConfigDirectory()
     {
         if (!Directory.Exists(_configPath))
             Directory.CreateDirectory(_configPath);
+    }
+
+    /// <summary>
+    /// 首次运行时从 config_default 复制默认配置
+    /// </summary>
+    private void EnsureDefaultConfigs()
+    {
+        var baseDir = AppDomain.CurrentDomain.BaseDirectory;
+        var defaultConfigDir = Path.Combine(baseDir, "config_default");
+        
+        // 如果 config_default 目录存在，复制缺失的配置文件
+        if (Directory.Exists(defaultConfigDir))
+        {
+            // 复制 appsettings.json
+            var defaultAppSettings = Path.Combine(defaultConfigDir, "appsettings.json");
+            if (File.Exists(defaultAppSettings) && !File.Exists(_appSettingsPath))
+            {
+                File.Copy(defaultAppSettings, _appSettingsPath);
+            }
+            
+            // 复制 skills.json
+            var defaultSkills = Path.Combine(defaultConfigDir, "skills.json");
+            if (File.Exists(defaultSkills) && !File.Exists(_skillsPath))
+            {
+                File.Copy(defaultSkills, _skillsPath);
+            }
+        }
     }
 
     public List<string> GetAvailableProfiles()
