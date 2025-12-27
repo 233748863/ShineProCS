@@ -278,7 +278,10 @@ public class SkillLoopEngine
                 _perfMonitor.StartOperation();
                 var gameState = _stateDetector.DetectGameState();
                 if (gameState.IsCasting) { Log("检测到读条中，等待...", 0); Thread.Sleep(50); continue; }
-                foreach (var s in _skillStates) _stateDetector.UpdateSkillState(s, currentFrame);
+                
+                // 使用并行模板匹配更新技能状态
+                _stateDetector.UpdateSkillStatesParallel(_skillStates);
+                
                 var success = ExecuteSkillCycle(gameState);
                 _perfMonitor.EndOperation(success);
                 loopCount++;

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.IO;
 using ShineProCS.Core.Interfaces;
 using ShineProCS.Models;
@@ -9,9 +10,8 @@ public class StateDetector
 {
     private readonly IImageInterface _image;
     private readonly ConfigManager _config;
-    private readonly Dictionary<string, Mat> _templateCache = [];
-    private readonly object _cacheLock = new();
-    private const int MaxCacheSize = 50; // 最大缓存数量
+    private readonly ConcurrentDictionary<string, Mat> _templateCache = new();
+    private const int MaxCacheSize = 50;
 
     public StateDetector(IImageInterface image, ConfigManager config)
     {
@@ -42,18 +42,55 @@ public class StateDetector
         }
         
         // 检测公共CD（读条状态）
-        // 公共CD激活 = 正在读条，此时不应打断当前技能
         if (settings.GlobalCdPoint.Any(v => v > 0))
         {
             state.IsGlobalCdActive = DetectGlobalCd(settings.GlobalCdPoint);
-            state.IsCasting = state.IsGlobalCdActive; // 公共CD激活时视为正在读条
+            state.IsCasting = state.IsGlobalCdActive;
         }
         
         return state;
     }
 
     /// <summary>
-    /// 检测血条/蓝条百分比（通过颜色检测，使用可配置阈值）
+    /// 并行更新多个技能的视觉状态
+    /// </summary>
+    public void UpdateSkillStatesParallel(IList<SkillRuntimeState> states)
+    {
+        if (states.Count == 0) return;
+        
+        // 少于3个技能时串行处理更高效
+        if (states.Count < 3)
+        {
+            foreach (var state in states)
+                UpdateSkillState(state);
+            return;
+        }
+
+        // 收集需要检测的技能（有配置区域的）
+        var toDetect = states.Where(s => 
+            s.Config.Enabled && 
+            s.Config.IconRegion.Any(v => v > 0)).ToList();
+
+        if (toDetect.Count == 0)
+        {
+            foreach (var s in states)
+                s.IsVisuallyReady = true;
+            return;
+        }
+
+        // 并行检测
+        Parallel.ForEach(toDetect, new ParallelOptions { MaxDegreeOfParallelism = 4 }, state =>
+        {
+            UpdateSkillState(state);
+        });
+
+        // 未配置区域的默认可用
+        foreach (var s in states.Where(s => !toDetect.Contains(s)))
+            s.IsVisuallyReady = true;
+    }
+
+    /// <summary>
+    /// 检测血条/蓝条百分比
     /// </summary>
     private double DetectBarPercent(int[] region, bool isHealth)
     {
@@ -67,18 +104,15 @@ public class StateDetector
         {
             var settings = _config.AppSettings;
             
-            // 转换到HSV颜色空间
             using var hsv = new Mat();
             Cv2.CvtColor(frame, hsv, ColorConversionCodes.BGR2HSV);
             
             using var mask = new Mat();
             if (isHealth)
             {
-                // 检测红色或绿色（血条可能是红色或绿色）
                 using var maskRed = new Mat();
                 using var maskGreen = new Mat();
                 
-                // 使用可配置的阈值
                 Cv2.InRange(hsv, 
                     new Scalar(settings.HealthHueMin, settings.HealthSatMin, settings.HealthValMin), 
                     new Scalar(settings.HealthHueMax, 255, 255), 
@@ -91,14 +125,12 @@ public class StateDetector
             }
             else
             {
-                // 检测蓝色，使用可配置的阈值
                 Cv2.InRange(hsv, 
                     new Scalar(settings.ManaHueMin, settings.ManaSatMin, settings.ManaValMin), 
                     new Scalar(settings.ManaHueMax, 255, 255), 
                     mask);
             }
             
-            // 计算非零像素占比
             var nonZero = Cv2.CountNonZero(mask);
             var total = frame.Width * frame.Height;
             var percent = (double)nonZero / total * 100.0;
@@ -112,7 +144,7 @@ public class StateDetector
     }
 
     /// <summary>
-    /// 检测公共CD是否激活（通过像素颜色判断进度条状态，使用可配置阈值）
+    /// 检测公共CD是否激活
     /// </summary>
     private bool DetectGlobalCd(int[] point)
     {
@@ -127,44 +159,35 @@ public class StateDetector
         var b = color.Value.b;
         var brightness = (r + g + b) / 3.0;
         
-        // 使用可配置的亮度阈值
         if (brightness > settings.GlobalCdBrightnessThreshold)
-        {
-            return true; // 亮度高，正在读条
-        }
+            return true;
         
-        // 也可以检测特定颜色（如黄色进度条）
-        // 黄色特征：R和G较高，B较低
+        // 黄色进度条检测
         if (r > 150 && g > 150 && b < 100)
-        {
-            return true; // 黄色进度条，正在读条
-        }
+            return true;
         
-        return false; // 无进度条，可以释放技能
+        return false;
     }
 
     /// <summary>
-    /// 更新技能视觉状态
+    /// 更新单个技能视觉状态
     /// </summary>
     public void UpdateSkillState(SkillRuntimeState state, Mat? frame = null)
     {
         var region = state.Config.IconRegion;
         
-        // 如果没有配置区域，默认可用
         if (region.All(v => v == 0))
         {
             state.IsVisuallyReady = true;
             return;
         }
         
-        // 如果有模板图片，使用模板匹配
         if (!string.IsNullOrEmpty(state.Config.TemplatePath) && File.Exists(state.Config.TemplatePath))
         {
             state.IsVisuallyReady = CheckSkillByTemplate(state.Config);
             return;
         }
         
-        // 否则使用亮度检测（技能可用时图标较亮）
         state.IsVisuallyReady = CheckSkillByBrightness(region);
     }
 
@@ -177,6 +200,7 @@ public class StateDetector
         if (region.Length < 4 || region[2] <= 0 || region[3] <= 0)
             return true;
         
+        // 直接截取技能图标区域（ROI优化）
         var frame = _image.GetScreenRegion(region[0], region[1], region[2], region[3]);
         if (frame == null) return true;
         
@@ -195,24 +219,23 @@ public class StateDetector
     }
 
     /// <summary>
-    /// 通过亮度检测技能是否可用（技能冷却中图标变暗，使用可配置阈值）
+    /// 通过亮度检测技能是否可用
     /// </summary>
     private bool CheckSkillByBrightness(int[] region)
     {
         if (region.Length < 4 || region[2] <= 0 || region[3] <= 0)
             return true;
         
+        // 直接截取技能图标区域（ROI优化）
         var frame = _image.GetScreenRegion(region[0], region[1], region[2], region[3]);
         if (frame == null) return true;
         
         try
         {
-            // 计算平均亮度
             using var gray = new Mat();
             Cv2.CvtColor(frame, gray, ColorConversionCodes.BGR2GRAY);
             var mean = Cv2.Mean(gray);
             
-            // 使用可配置的亮度阈值
             return mean.Val0 > _config.AppSettings.SkillBrightnessThreshold;
         }
         finally
@@ -234,33 +257,28 @@ public class StateDetector
             var buffExists = CheckBuffExists(buff);
             
             if (buff.IsRequired && !buffExists)
-                return false; // 需要存在但不存在
+                return false;
             
             if (!buff.IsRequired && buffExists)
-                return false; // 需要不存在但存在
+                return false;
         }
         
         return true;
     }
 
     /// <summary>
-    /// 检查Buff是否存在（公开方法）
+    /// 检查Buff是否存在
     /// </summary>
     public bool CheckBuffExists(BuffRequirement buff)
     {
         var region = buff.IconRegion;
         
-        // 如果没有配置区域，默认存在
         if (region.All(v => v == 0))
             return true;
         
-        // 如果有模板，使用模板匹配
         if (!string.IsNullOrEmpty(buff.TemplatePath) && File.Exists(buff.TemplatePath))
-        {
             return CheckBuffByTemplate(buff);
-        }
         
-        // 否则使用亮度检测
         return CheckBuffByBrightness(region);
     }
 
@@ -291,7 +309,7 @@ public class StateDetector
     }
 
     /// <summary>
-    /// 通过亮度检测Buff是否存在（使用可配置阈值）
+    /// 通过亮度检测Buff是否存在
     /// </summary>
     private bool CheckBuffByBrightness(int[] region)
     {
@@ -307,7 +325,6 @@ public class StateDetector
             Cv2.CvtColor(frame, gray, ColorConversionCodes.BGR2GRAY);
             var mean = Cv2.Mean(gray);
             
-            // 使用可配置的亮度阈值
             return mean.Val0 > _config.AppSettings.BuffBrightnessThreshold;
         }
         finally
@@ -317,17 +334,14 @@ public class StateDetector
     }
 
     /// <summary>
-    /// 获取模板图片（带缓存和大小限制）
+    /// 获取模板图片（线程安全缓存）
     /// </summary>
     private Mat? GetTemplate(string path)
     {
         if (string.IsNullOrEmpty(path)) return null;
         
-        lock (_cacheLock)
-        {
-            if (_templateCache.TryGetValue(path, out var cached))
-                return cached;
-        }
+        if (_templateCache.TryGetValue(path, out var cached))
+            return cached;
         
         if (!File.Exists(path)) return null;
         
@@ -336,23 +350,18 @@ public class StateDetector
             var template = Cv2.ImRead(path, ImreadModes.Color);
             if (!template.Empty())
             {
-                lock (_cacheLock)
+                // 超过限制时清理旧缓存
+                if (_templateCache.Count >= MaxCacheSize)
                 {
-                    // LRU 简化实现：超过限制时清理一半缓存
-                    if (_templateCache.Count >= MaxCacheSize)
+                    var keysToRemove = _templateCache.Keys.Take(_templateCache.Count / 2).ToList();
+                    foreach (var key in keysToRemove)
                     {
-                        var keysToRemove = _templateCache.Keys.Take(_templateCache.Count / 2).ToList();
-                        foreach (var key in keysToRemove)
-                        {
-                            if (_templateCache.TryGetValue(key, out var mat))
-                            {
-                                mat.Dispose();
-                                _templateCache.Remove(key);
-                            }
-                        }
+                        if (_templateCache.TryRemove(key, out var mat))
+                            mat.Dispose();
                     }
-                    _templateCache[path] = template;
                 }
+                
+                _templateCache[path] = template;
                 return template;
             }
             template.Dispose();
@@ -367,12 +376,9 @@ public class StateDetector
     /// </summary>
     public void ClearTemplateCache()
     {
-        lock (_cacheLock)
-        {
-            foreach (var mat in _templateCache.Values)
-                mat.Dispose();
-            _templateCache.Clear();
-        }
+        foreach (var kvp in _templateCache)
+            kvp.Value.Dispose();
+        _templateCache.Clear();
     }
 
     /// <summary>
@@ -384,15 +390,12 @@ public class StateDetector
         {
             var state = DetectGameState();
             
-            // 方案1：HP不满表示可能在战斗
             if (state.HpPercentage < 0.95)
                 return true;
             
-            // 方案2：公共CD激活表示正在释放技能
             if (state.IsGlobalCdActive)
                 return true;
             
-            // 方案3：检测目标框（如果配置了）
             var settings = _config.AppSettings;
             if (settings.DetectionRegion.Any(v => v > 0))
             {
@@ -406,14 +409,12 @@ public class StateDetector
                 {
                     try
                     {
-                        // 检测区域内是否有明显的亮点（目标标记）
                         using var gray = new Mat();
                         Cv2.CvtColor(frame, gray, ColorConversionCodes.BGR2GRAY);
                         using var threshold = new Mat();
                         Cv2.Threshold(gray, threshold, 200, 255, ThresholdTypes.Binary);
                         var nonZero = Cv2.CountNonZero(threshold);
                         
-                        // 如果有足够多的亮点，认为有目标
                         if (nonZero > 100)
                             return true;
                     }

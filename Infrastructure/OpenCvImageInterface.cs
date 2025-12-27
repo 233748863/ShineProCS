@@ -1,6 +1,7 @@
 using System.Drawing;
 using System.Runtime.InteropServices;
 using ShineProCS.Core.Interfaces;
+using ShineProCS.Core.Services;
 using OpenCvSharp;
 
 namespace ShineProCS.Infrastructure;
@@ -17,8 +18,16 @@ public class OpenCvImageInterface : IImageInterface, IDisposable
     private bool _useWgc;
     private IntPtr _targetHwnd;
     private bool _disposed;
+    
+    // Mat 对象池
+    private readonly MatPool _matPool = new(30);
 
     public bool UseWgc => _useWgc;
+    
+    /// <summary>
+    /// 获取对象池统计信息
+    /// </summary>
+    public (int Created, int Reused, int PoolSize) PoolStats => _matPool.GetStats();
 
     /// <summary>
     /// 初始化WGC截图模式
@@ -69,27 +78,14 @@ public class OpenCvImageInterface : IImageInterface, IDisposable
         // 优先使用WGC
         if (_useWgc && _wgc != null)
         {
-            Mat? frame = null;
-            Mat? region = null;
             try
             {
-                frame = _wgc.CaptureFrameBgr();
-                if (frame != null)
-                {
-                    // 如果请求的区域在WGC捕获范围内，直接裁剪
-                    if (x >= 0 && y >= 0 && x + w <= frame.Width && y + h <= frame.Height)
-                    {
-                        region = new Mat(frame, new Rect(x, y, w, h));
-                        return region.Clone();
-                    }
-                }
+                // 直接使用 WGC 的区域截取功能，避免全屏截图再裁剪
+                var region = _wgc.CaptureRegion(x, y, w, h);
+                if (region != null)
+                    return region;
             }
             catch { }
-            finally
-            {
-                region?.Dispose();
-                frame?.Dispose();
-            }
         }
         
         // 回退到GDI截图
@@ -98,14 +94,22 @@ public class OpenCvImageInterface : IImageInterface, IDisposable
 
     private Mat? GetScreenRegionGdi(int x, int y, int w, int h)
     {
+        Bitmap? bmp = null;
         try
         {
-            using var bmp = new Bitmap(w, h);
+            bmp = new Bitmap(w, h);
             using var g = Graphics.FromImage(bmp);
             g.CopyFromScreen(x, y, 0, 0, new System.Drawing.Size(w, h));
-            return BitmapToMat(bmp);
+            return BitmapToMatPooled(bmp);
         }
-        catch { return null; }
+        catch 
+        { 
+            return null; 
+        }
+        finally
+        {
+            bmp?.Dispose();
+        }
     }
 
     public (byte r, byte g, byte b)? GetPixelColor(int x, int y)
@@ -132,18 +136,49 @@ public class OpenCvImageInterface : IImageInterface, IDisposable
     public double MatchTemplate(Mat src, Mat tpl)
     {
         if (src.Empty() || tpl.Empty()) return 0;
-        try { using var r = new Mat(); Cv2.MatchTemplate(src, tpl, r, TemplateMatchModes.CCoeffNormed); Cv2.MinMaxLoc(r, out _, out double max, out _, out _); return max; }
+        
+        Mat? result = null;
+        try 
+        { 
+            result = _matPool.RentEmpty();
+            Cv2.MatchTemplate(src, tpl, result, TemplateMatchModes.CCoeffNormed); 
+            Cv2.MinMaxLoc(result, out _, out double max, out _, out _); 
+            return max; 
+        }
         catch { return 0; }
+        finally
+        {
+            _matPool.Return(result);
+        }
     }
 
-    public void ReturnMat(Mat m) => m?.Dispose();
+    public void ReturnMat(Mat m)
+    {
+        if (m == null) return;
+        _matPool.Return(m);
+    }
 
-    private static Mat BitmapToMat(Bitmap bmp)
+    /// <summary>
+    /// 使用对象池的 Bitmap 转 Mat
+    /// </summary>
+    private Mat BitmapToMatPooled(Bitmap bmp)
     {
         var rect = new Rectangle(0, 0, bmp.Width, bmp.Height);
         var data = bmp.LockBits(rect, System.Drawing.Imaging.ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
-        var mat = new Mat(bmp.Height, bmp.Width, MatType.CV_8UC3);
-        unsafe { for (int y = 0; y < bmp.Height; y++) Buffer.MemoryCopy((byte*)data.Scan0 + y * data.Stride, mat.DataPointer + y * bmp.Width * 3, bmp.Width * 3, bmp.Width * 3); }
+        
+        // 从对象池获取 Mat
+        var mat = _matPool.Rent(bmp.Height, bmp.Width, MatType.CV_8UC3);
+        
+        unsafe 
+        { 
+            for (int y = 0; y < bmp.Height; y++) 
+                Buffer.MemoryCopy(
+                    (byte*)data.Scan0 + y * data.Stride, 
+                    mat.DataPointer + y * bmp.Width * 3, 
+                    bmp.Width * 3, 
+                    bmp.Width * 3); 
+        }
+        
         bmp.UnlockBits(data);
         return mat;
     }
@@ -152,6 +187,7 @@ public class OpenCvImageInterface : IImageInterface, IDisposable
     {
         if (_disposed) return;
         _wgc?.Dispose();
+        _matPool.Dispose();
         _disposed = true;
         GC.SuppressFinalize(this);
     }
