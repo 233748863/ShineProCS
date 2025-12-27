@@ -22,6 +22,7 @@ public class SkillLoopEngine
     private readonly IImageInterface _image;
     private readonly ConfigManager _config;
     private readonly StateDetector _stateDetector;
+    private readonly TemplatePreloader _templatePreloader;
     
     #endregion
     
@@ -53,8 +54,11 @@ public class SkillLoopEngine
     /// 生产者-消费者模型的图像队列
     /// </summary>
     private BlockingCollection<Mat> _imageQueue = null!;
-    private byte[]? _lastFrameHash;
     private int _unchangedFrameCount;
+    
+    // 帧差分优化：使用像素采样代替pHash
+    private int _lastSampleSum;
+    private const int SampleStride = 16; // 采样步长
     
     #endregion
     
@@ -105,7 +109,14 @@ public class SkillLoopEngine
         _keyboard = keyboard;
         _image = image;
         _config = config;
-        _stateDetector = new StateDetector(image, config);
+        
+        // 初始化模板预加载器
+        _templatePreloader = new TemplatePreloader();
+        var preloadCount = _templatePreloader.PreloadFromConfig(config);
+        if (preloadCount > 0)
+            Log($"已预加载 {preloadCount} 个模板到内存", 1);
+        
+        _stateDetector = new StateDetector(image, config, _templatePreloader);
         
         // 使用策略加载器加载所有策略（内置 + 插件）
         _strategyLoader = new StrategyLoader();
@@ -312,60 +323,50 @@ public class SkillLoopEngine
         }
     }
 
+    /// <summary>
+    /// 快速帧差分检测（像素采样法）
+    /// 比pHash更快，适合高频检测场景
+    /// </summary>
     private bool IsFrameUnchanged(Mat frame)
     {
         try
         {
-            // 使用感知哈希（pHash）的简化版本：缩小 + 灰度 + 二值化
-            using var small = new Mat();
-            using var gray = new Mat();
-            
-            // 缩小到 8x8
-            Cv2.Resize(frame, small, new OpenCvSharp.Size(8, 8), interpolation: InterpolationFlags.Area);
-            
-            // 转灰度
-            Cv2.CvtColor(small, gray, ColorConversionCodes.BGR2GRAY);
-            
-            // 计算平均值并生成哈希
-            var mean = Cv2.Mean(gray).Val0;
-            var hash = new byte[8];
+            // 像素采样法：每隔SampleStride个像素采样一次，计算总和
+            int sum = 0;
+            int width = frame.Width;
+            int height = frame.Height;
+            int channels = frame.Channels();
             
             unsafe
             {
-                var ptr = (byte*)gray.DataPointer;
-                for (int i = 0; i < 64; i++)
+                var ptr = (byte*)frame.DataPointer;
+                int stride = (int)frame.Step();
+                
+                // 采样计算
+                for (int y = 0; y < height; y += SampleStride)
                 {
-                    if (ptr[i] > mean)
-                        hash[i / 8] |= (byte)(1 << (i % 8));
-                }
-            }
-            
-            // 比较哈希（汉明距离）
-            if (_lastFrameHash != null)
-            {
-                int diff = 0;
-                for (int i = 0; i < 8; i++)
-                {
-                    var xor = (byte)(hash[i] ^ _lastFrameHash[i]);
-                    // 计算位差异数
-                    while (xor != 0)
+                    var row = ptr + y * stride;
+                    for (int x = 0; x < width; x += SampleStride)
                     {
-                        diff += xor & 1;
-                        xor >>= 1;
+                        int offset = x * channels;
+                        // 简单灰度：(R+G+B)/3 的近似
+                        sum += row[offset] + row[offset + 1] + row[offset + 2];
                     }
                 }
-                
-                // 如果差异小于阈值（5位），认为帧未变化
-                if (diff < 5)
-                    return true;
             }
             
-            _lastFrameHash = hash;
-            return false;
+            // 比较差异
+            int diff = Math.Abs(sum - _lastSampleSum);
+            _lastSampleSum = sum;
+            
+            // 差异阈值：根据采样点数量动态计算
+            int sampleCount = (width / SampleStride) * (height / SampleStride);
+            int threshold = sampleCount * 15; // 平均每个采样点允许15的差异
+            
+            return diff < threshold;
         }
-        catch (Exception ex)
+        catch
         {
-            Log($"帧对比异常: {ex.Message}", 0);
             return false;
         }
     }

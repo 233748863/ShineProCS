@@ -11,12 +11,14 @@ public class StateDetector
     private readonly IImageInterface _image;
     private readonly ConfigManager _config;
     private readonly ConcurrentDictionary<string, Mat> _templateCache = new();
+    private readonly TemplatePreloader? _preloader;
     private const int MaxCacheSize = 50;
 
-    public StateDetector(IImageInterface image, ConfigManager config)
+    public StateDetector(IImageInterface image, ConfigManager config, TemplatePreloader? preloader = null)
     {
         _image = image;
         _config = config;
+        _preloader = preloader;
     }
 
     /// <summary>
@@ -334,11 +336,18 @@ public class StateDetector
     }
 
     /// <summary>
-    /// 获取模板图片（线程安全缓存）
+    /// 获取模板图片（优先从预加载器获取，线程安全缓存）
     /// </summary>
     private Mat? GetTemplate(string path)
     {
         if (string.IsNullOrEmpty(path)) return null;
+        
+        // 优先从预加载器获取
+        if (_preloader != null)
+        {
+            var preloaded = _preloader.GetTemplate(path);
+            if (preloaded != null) return preloaded;
+        }
         
         if (_templateCache.TryGetValue(path, out var cached))
             return cached;

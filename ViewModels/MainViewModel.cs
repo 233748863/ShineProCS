@@ -883,6 +883,169 @@ public partial class MainViewModel : ObservableObject, IDisposable
         
         _hasUnsavedChanges = false;
     }
+
+    #region 配置导入导出
+
+    [RelayCommand]
+    private void ExportConfig()
+    {
+        var dlg = new Microsoft.Win32.SaveFileDialog
+        {
+            Filter = "配置包|*.zip",
+            FileName = $"ShineProCS_Config_{DateTime.Now:yyyyMMdd}",
+            Title = "导出配置"
+        };
+        
+        if (dlg.ShowDialog() != true) return;
+        
+        try
+        {
+            _config.ExportConfig(dlg.FileName, includeTemplates: true);
+            ToastManager.Success("配置已导出", "导出成功");
+            OnLog($"配置已导出到: {dlg.FileName}", 1);
+        }
+        catch (Exception ex)
+        {
+            ToastManager.Error($"导出失败: {ex.Message}", "导出错误");
+            OnLog($"导出失败: {ex.Message}", 3);
+        }
+    }
+
+    [RelayCommand]
+    private void ImportConfig()
+    {
+        var dlg = new Microsoft.Win32.OpenFileDialog
+        {
+            Filter = "配置包|*.zip",
+            Title = "导入配置"
+        };
+        
+        if (dlg.ShowDialog() != true) return;
+        
+        var result = System.Windows.MessageBox.Show(
+            "导入配置将覆盖现有配置，是否继续？\n（现有配置会自动备份）",
+            "确认导入",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+        
+        if (result != MessageBoxResult.Yes) return;
+        
+        try
+        {
+            var msg = _config.ImportConfig(dlg.FileName, overwrite: true);
+            LoadSkills();
+            RefreshProfiles();
+            ToastManager.Success(msg, "导入成功");
+            OnLog(msg, 1);
+        }
+        catch (Exception ex)
+        {
+            ToastManager.Error($"导入失败: {ex.Message}", "导入错误");
+            OnLog($"导入失败: {ex.Message}", 3);
+        }
+    }
+
+    [RelayCommand]
+    private void ExportProfile()
+    {
+        var dlg = new Microsoft.Win32.SaveFileDialog
+        {
+            Filter = "方案配置|*.zip",
+            FileName = $"ShineProCS_Profile_{SelectedProfile}_{DateTime.Now:yyyyMMdd}",
+            Title = "导出当前方案"
+        };
+        
+        if (dlg.ShowDialog() != true) return;
+        
+        try
+        {
+            _config.ExportProfile(SelectedProfile, dlg.FileName);
+            ToastManager.Success($"方案 [{SelectedProfile}] 已导出", "导出成功");
+            OnLog($"方案已导出到: {dlg.FileName}", 1);
+        }
+        catch (Exception ex)
+        {
+            ToastManager.Error($"导出失败: {ex.Message}", "导出错误");
+        }
+    }
+
+    #endregion
+
+    #region 快捷键配置
+
+    /// <summary>
+    /// 启动/停止快捷键修饰键索引（用于ComboBox绑定）
+    /// </summary>
+    public int StartStopModifierIndex
+    {
+        get => ModifierToIndex(AppSettings.HotkeyStartStopModifier);
+        set { AppSettings.HotkeyStartStopModifier = IndexToModifier(value); OnPropertyChanged(); }
+    }
+
+    /// <summary>
+    /// 暂停快捷键修饰键索引
+    /// </summary>
+    public int PauseModifierIndex
+    {
+        get => ModifierToIndex(AppSettings.HotkeyPauseModifier);
+        set { AppSettings.HotkeyPauseModifier = IndexToModifier(value); OnPropertyChanged(); }
+    }
+
+    /// <summary>
+    /// 七情模式快捷键修饰键索引
+    /// </summary>
+    public int QiQingModifierIndex
+    {
+        get => ModifierToIndex(AppSettings.HotkeyQiQingModifier);
+        set { AppSettings.HotkeyQiQingModifier = IndexToModifier(value); OnPropertyChanged(); }
+    }
+
+    private static int ModifierToIndex(uint modifier) => modifier switch
+    {
+        0 => 0,  // 无
+        2 => 1,  // Ctrl
+        1 => 2,  // Alt
+        4 => 3,  // Shift
+        _ => 0
+    };
+
+    private static uint IndexToModifier(int index) => index switch
+    {
+        0 => 0,  // 无
+        1 => 2,  // Ctrl
+        2 => 1,  // Alt
+        3 => 4,  // Shift
+        _ => 0
+    };
+
+    [RelayCommand]
+    private void CaptureHotkey(string? hotkeyType)
+    {
+        if (string.IsNullOrEmpty(hotkeyType)) return;
+        
+        var window = new KeyCaptureWindow { Owner = System.Windows.Application.Current.MainWindow };
+        if (window.ShowDialog() != true) return;
+        
+        var keyCode = (uint)window.CapturedKeyCode;
+        
+        switch (hotkeyType)
+        {
+            case "StartStop":
+                AppSettings.HotkeyStartStopKey = keyCode;
+                break;
+            case "Pause":
+                AppSettings.HotkeyPauseKey = keyCode;
+                break;
+            case "QiQing":
+                AppSettings.HotkeyQiQingKey = keyCode;
+                break;
+        }
+        
+        OnLog($"设置快捷键 [{hotkeyType}]: {window.CapturedKeyName}", 1);
+        OnPropertyChanged(nameof(AppSettings));
+    }
+
+    #endregion
     
     private List<string> ValidateConfig()
     {
@@ -979,94 +1142,5 @@ public partial class MainViewModel : ObservableObject, IDisposable
         SelectedProfile = "默认";
         OnLog($"已删除方案: {deletedName}", 1);
         ToastManager.Info($"方案 '{deletedName}' 已删除");
-    }
-
-    [RelayCommand]
-    private void ExportConfig()
-    {
-        var dlg = new Microsoft.Win32.SaveFileDialog
-        {
-            Filter = "配置包|*.zip|所有文件|*.*",
-            FileName = $"ShineProCS_Config_{DateTime.Now:yyyyMMdd_HHmmss}.zip",
-            Title = "导出配置"
-        };
-        
-        if (dlg.ShowDialog() != true) return;
-        
-        try
-        {
-            var configDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config");
-            
-            using var zipStream = new FileStream(dlg.FileName, FileMode.Create);
-            using var archive = new ZipArchive(zipStream, ZipArchiveMode.Create);
-            
-            var skillsPath = Path.Combine(configDir, "skills.json");
-            if (File.Exists(skillsPath))
-                archive.CreateEntryFromFile(skillsPath, "skills.json");
-            
-            var settingsPath = Path.Combine(configDir, "appsettings.json");
-            if (File.Exists(settingsPath))
-                archive.CreateEntryFromFile(settingsPath, "appsettings.json");
-            
-            OnLog($"配置已导出: {dlg.FileName}", 1);
-            Views.ToastManager.Success("配置包已导出", "导出成功");
-        }
-        catch (Exception ex)
-        {
-            OnLog($"导出失败: {ex.Message}", 2);
-            Views.ToastManager.Error(ex.Message, "导出失败");
-        }
-    }
-
-    [RelayCommand]
-    private void ImportConfig()
-    {
-        var dlg = new Microsoft.Win32.OpenFileDialog
-        {
-            Filter = "配置包|*.zip|所有文件|*.*",
-            Title = "导入配置"
-        };
-        
-        if (dlg.ShowDialog() != true) return;
-        
-        try
-        {
-            var configDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config");
-            
-            var backupDir = Path.Combine(configDir, $"backup_{DateTime.Now:yyyyMMdd_HHmmss}");
-            Directory.CreateDirectory(backupDir);
-            
-            var skillsPath = Path.Combine(configDir, "skills.json");
-            var settingsPath = Path.Combine(configDir, "appsettings.json");
-            
-            if (File.Exists(skillsPath))
-                File.Copy(skillsPath, Path.Combine(backupDir, "skills.json"));
-            if (File.Exists(settingsPath))
-                File.Copy(settingsPath, Path.Combine(backupDir, "appsettings.json"));
-            
-            using var zipStream = new FileStream(dlg.FileName, FileMode.Open);
-            using var archive = new ZipArchive(zipStream, ZipArchiveMode.Read);
-            
-            foreach (var entry in archive.Entries)
-            {
-                if (entry.Name == "skills.json" || entry.Name == "appsettings.json")
-                {
-                    var destPath = Path.Combine(configDir, entry.Name);
-                    entry.ExtractToFile(destPath, overwrite: true);
-                }
-            }
-            
-            _config.LoadConfigs();
-            AppSettings = _config.AppSettings;
-            LoadSkills();
-            
-            OnLog($"配置已导入，原配置已备份到: {backupDir}", 1);
-            Views.ToastManager.Success("配置已导入，原配置已备份", "导入成功");
-        }
-        catch (Exception ex)
-        {
-            OnLog($"导入失败: {ex.Message}", 2);
-            Views.ToastManager.Error(ex.Message, "导入失败");
-        }
     }
 }

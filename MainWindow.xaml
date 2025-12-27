@@ -554,6 +554,90 @@
                                 </StackPanel>
                             </ui:Card>
                             
+                            <!-- 全局快捷键设置 -->
+                            <ui:Card Margin="0,0,0,16">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                        <TextBlock Text="全局快捷键" FontSize="16" FontWeight="SemiBold"/>
+                                        <ui:ToggleSwitch IsChecked="{Binding AppSettings.EnableGlobalHotkeys}" Content="启用" Margin="16,0,0,0"/>
+                                    </StackPanel>
+                                    <TextBlock Text="快捷键在游戏窗口中也能响应" Style="{StaticResource HintTextStyle}" Margin="0,0,0,12"/>
+                                    
+                                    <!-- 启动/停止快捷键 -->
+                                    <Grid Margin="0,0,0,8"><Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <TextBlock Text="启动/停止" VerticalAlignment="Center"/>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                            <ComboBox Width="80" SelectedIndex="{Binding StartStopModifierIndex}" Margin="0,0,8,0">
+                                                <ComboBoxItem Content="无"/>
+                                                <ComboBoxItem Content="Ctrl"/>
+                                                <ComboBoxItem Content="Alt"/>
+                                                <ComboBoxItem Content="Shift"/>
+                                            </ComboBox>
+                                            <TextBlock Text="+" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                            <Border Background="#333" CornerRadius="4" Padding="12,6" MinWidth="60">
+                                                <TextBlock Text="{Binding AppSettings.HotkeyStartStopKey, Converter={StaticResource KeyToName}}" HorizontalAlignment="Center"/>
+                                            </Border>
+                                        </StackPanel>
+                                        <ui:Button Grid.Column="2" Content="设置" Height="32" Margin="8,0,0,0" Command="{Binding CaptureHotkeyCommand}" CommandParameter="StartStop"/>
+                                    </Grid>
+                                    
+                                    <!-- 暂停快捷键 -->
+                                    <Grid Margin="0,0,0,8"><Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <TextBlock Text="暂停/恢复" VerticalAlignment="Center"/>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                            <ComboBox Width="80" SelectedIndex="{Binding PauseModifierIndex}" Margin="0,0,8,0">
+                                                <ComboBoxItem Content="无"/>
+                                                <ComboBoxItem Content="Ctrl"/>
+                                                <ComboBoxItem Content="Alt"/>
+                                                <ComboBoxItem Content="Shift"/>
+                                            </ComboBox>
+                                            <TextBlock Text="+" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                            <Border Background="#333" CornerRadius="4" Padding="12,6" MinWidth="60">
+                                                <TextBlock Text="{Binding AppSettings.HotkeyPauseKey, Converter={StaticResource KeyToName}}" HorizontalAlignment="Center"/>
+                                            </Border>
+                                        </StackPanel>
+                                        <ui:Button Grid.Column="2" Content="设置" Height="32" Margin="8,0,0,0" Command="{Binding CaptureHotkeyCommand}" CommandParameter="Pause"/>
+                                    </Grid>
+                                    
+                                    <!-- 七情模式快捷键 -->
+                                    <Grid Margin="0,0,0,8"><Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <TextBlock Text="七情模式" VerticalAlignment="Center"/>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                            <ComboBox Width="80" SelectedIndex="{Binding QiQingModifierIndex}" Margin="0,0,8,0">
+                                                <ComboBoxItem Content="无"/>
+                                                <ComboBoxItem Content="Ctrl"/>
+                                                <ComboBoxItem Content="Alt"/>
+                                                <ComboBoxItem Content="Shift"/>
+                                            </ComboBox>
+                                            <TextBlock Text="+" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                            <Border Background="#333" CornerRadius="4" Padding="12,6" MinWidth="60">
+                                                <TextBlock Text="{Binding AppSettings.HotkeyQiQingKey, Converter={StaticResource KeyToName}}" HorizontalAlignment="Center"/>
+                                            </Border>
+                                        </StackPanel>
+                                        <ui:Button Grid.Column="2" Content="设置" Height="32" Margin="8,0,0,0" Command="{Binding CaptureHotkeyCommand}" CommandParameter="QiQing"/>
+                                    </Grid>
+                                    
+                                    <ui:Button Content="重新注册快捷键" Command="{Binding ReregisterHotkeysCommand}" Margin="0,8,0,0"/>
+                                </StackPanel>
+                            </ui:Card>
+                            
+                            <!-- 配置导入导出 -->
+                            <ui:Card Margin="0,0,0,16">
+                                <StackPanel>
+                                    <TextBlock Text="配置导入导出" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,12"/>
+                                    <TextBlock Text="导出配置可用于备份或分享给其他用户" Style="{StaticResource HintTextStyle}" Margin="0,0,0,12"/>
+                                    <StackPanel Orientation="Horizontal">
+                                        <ui:Button Content="导出全部配置" Command="{Binding ExportConfigCommand}" Margin="0,0,8,0">
+                                            <ui:Button.Icon><ui:SymbolIcon Symbol="ArrowUpload24"/></ui:Button.Icon>
+                                        </ui:Button>
+                                        <ui:Button Content="导入配置" Command="{Binding ImportConfigCommand}" Margin="0,0,8,0">
+                                            <ui:Button.Icon><ui:SymbolIcon Symbol="ArrowDownload24"/></ui:Button.Icon>
+                                        </ui:Button>
+                                        <ui:Button Content="导出当前方案" Command="{Binding ExportProfileCommand}"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </ui:Card>
+                            
                             <!-- 保存按钮 -->
                             <ui:Button Content="保存设置" Appearance="Primary" Command="{Binding SaveSettingsCommand}" Height="44" HorizontalAlignment="Stretch"/>
                         </StackPanel>

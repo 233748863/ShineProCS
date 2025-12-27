@@ -221,50 +221,35 @@ public static class DragDropBehavior
     /// </summary>
     private static void CreateDragWindow(ListBoxItem item)
     {
-        // 获取实际内容的大小（排除 ListBoxItem 的 padding/margin）
-        var content = item.Content as FrameworkElement;
-        var actualWidth = content?.ActualWidth ?? item.ActualWidth;
-        var actualHeight = content?.ActualHeight ?? item.ActualHeight;
-        
-        // 限制最大宽度
-        actualWidth = Math.Min(actualWidth, 280);
-        
-        // 创建项的视觉副本
-        var visual = new VisualBrush(item)
+        // 获取技能名称
+        string skillName = "技能";
+        try { skillName = (item.DataContext as dynamic)?.Name ?? "技能"; } catch { }
+
+        // 使用原始 ListBoxItem 的实际尺寸
+        var itemWidth = item.ActualWidth;
+        var itemHeight = item.ActualHeight;
+
+        var textBlock = new TextBlock
         {
-            Opacity = 0.85,
-            Stretch = Stretch.None,
-            AlignmentX = AlignmentX.Left,
-            AlignmentY = AlignmentY.Top
+            Text = skillName,
+            Foreground = Brushes.White,
+            FontWeight = FontWeights.SemiBold,
+            FontSize = 13,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(8, 0, 0, 0)
         };
 
         var border = new Border
         {
-            Width = actualWidth,
-            Height = actualHeight + 8, // 加一点高度补偿
+            Width = itemWidth,
+            Height = itemHeight,
             Background = new SolidColorBrush(Color.FromArgb(240, 45, 45, 45)),
             BorderBrush = new SolidColorBrush(Color.FromRgb(0, 120, 215)),
-            BorderThickness = new Thickness(2),
-            CornerRadius = new CornerRadius(6),
-            Padding = new Thickness(8, 4, 8, 4),
-            Child = new TextBlock
-            {
-                Text = (item.DataContext as dynamic)?.Name ?? "技能",
-                Foreground = Brushes.White,
-                FontWeight = FontWeights.SemiBold,
-                FontSize = 13,
-                VerticalAlignment = VerticalAlignment.Center
-            },
-            Effect = new DropShadowEffect
-            {
-                Color = Colors.Black,
-                BlurRadius = 12,
-                ShadowDepth = 3,
-                Opacity = 0.5
-            }
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(4),
+            Child = textBlock
         };
 
-        // 创建无边框透明窗口
         _dragWindow = new Window
         {
             Content = border,
@@ -274,7 +259,10 @@ public static class DragDropBehavior
             ShowInTaskbar = false,
             Topmost = true,
             IsHitTestVisible = false,
+            ResizeMode = ResizeMode.NoResize,
             SizeToContent = SizeToContent.WidthAndHeight,
+            MinWidth = 1,
+            MinHeight = 1
         };
 
         _dragWindow.Show();

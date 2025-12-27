@@ -1,4 +1,5 @@
 using System.IO;
+using System.IO.Compression;
 using System.Text.Json;
 using ShineProCS.Models;
 
@@ -402,6 +403,133 @@ public class ConfigManager
     }
 
     public void SaveAll() { SaveAppSettings(); SaveSkills(); }
+
+    /// <summary>
+    /// 导出配置到ZIP文件
+    /// </summary>
+    /// <param name="exportPath">导出路径</param>
+    /// <param name="includeTemplates">是否包含模板图片</param>
+    public void ExportConfig(string exportPath, bool includeTemplates = true)
+    {
+        lock (_configLock)
+        {
+            using var archive = System.IO.Compression.ZipFile.Open(exportPath, System.IO.Compression.ZipArchiveMode.Create);
+            
+            // 导出 appsettings.json
+            if (File.Exists(_appSettingsPath))
+                archive.CreateEntryFromFile(_appSettingsPath, "appsettings.json");
+            
+            // 导出当前技能配置
+            if (File.Exists(_skillsPath))
+                archive.CreateEntryFromFile(_skillsPath, Path.GetFileName(_skillsPath));
+            
+            // 导出模板图片
+            if (includeTemplates && _skills != null)
+            {
+                var templateDir = Path.Combine(_configPath, "templates");
+                if (Directory.Exists(templateDir))
+                {
+                    foreach (var file in Directory.GetFiles(templateDir, "*.*", SearchOption.AllDirectories))
+                    {
+                        var relativePath = Path.GetRelativePath(_configPath, file);
+                        archive.CreateEntryFromFile(file, relativePath);
+                    }
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// 从ZIP文件导入配置
+    /// </summary>
+    /// <param name="importPath">导入路径</param>
+    /// <param name="overwrite">是否覆盖现有配置</param>
+    /// <returns>导入结果信息</returns>
+    public string ImportConfig(string importPath, bool overwrite = false)
+    {
+        if (!File.Exists(importPath))
+            return "导入文件不存在";
+        
+        lock (_configLock)
+        {
+            try
+            {
+                using var archive = System.IO.Compression.ZipFile.OpenRead(importPath);
+                int imported = 0;
+                
+                foreach (var entry in archive.Entries)
+                {
+                    var targetPath = Path.Combine(_configPath, entry.FullName);
+                    var targetDir = Path.GetDirectoryName(targetPath);
+                    
+                    if (!string.IsNullOrEmpty(targetDir) && !Directory.Exists(targetDir))
+                        Directory.CreateDirectory(targetDir);
+                    
+                    if (File.Exists(targetPath) && !overwrite)
+                    {
+                        // 备份现有文件
+                        var backupPath = $"{targetPath}.import_backup_{DateTime.Now:yyyyMMddHHmmss}";
+                        File.Move(targetPath, backupPath);
+                    }
+                    
+                    entry.ExtractToFile(targetPath, overwrite: true);
+                    imported++;
+                }
+                
+                // 重新加载配置
+                LoadConfigs();
+                
+                return $"成功导入 {imported} 个文件";
+            }
+            catch (Exception ex)
+            {
+                return $"导入失败: {ex.Message}";
+            }
+        }
+    }
+
+    /// <summary>
+    /// 导出单个方案
+    /// </summary>
+    public void ExportProfile(string profileName, string exportPath)
+    {
+        var skillsFile = profileName == "默认" 
+            ? Path.Combine(_configPath, "skills.json")
+            : Path.Combine(_configPath, $"skills_{profileName}.json");
+        
+        if (!File.Exists(skillsFile))
+            return;
+        
+        lock (_configLock)
+        {
+            using var archive = System.IO.Compression.ZipFile.Open(exportPath, System.IO.Compression.ZipArchiveMode.Create);
+            archive.CreateEntryFromFile(skillsFile, Path.GetFileName(skillsFile));
+            
+            // 读取技能配置，导出相关模板
+            var json = File.ReadAllText(skillsFile);
+            var skills = JsonSerializer.Deserialize<List<SkillConfig>>(json);
+            if (skills != null)
+            {
+                foreach (var skill in skills)
+                {
+                    if (!string.IsNullOrEmpty(skill.TemplatePath) && File.Exists(skill.TemplatePath))
+                    {
+                        var relativePath = Path.GetRelativePath(_configPath, skill.TemplatePath);
+                        try { archive.CreateEntryFromFile(skill.TemplatePath, relativePath); } catch { }
+                    }
+                    
+                    foreach (var buff in skill.BuffRequirements)
+                    {
+                        if (!string.IsNullOrEmpty(buff.TemplatePath) && File.Exists(buff.TemplatePath))
+                        {
+                            var relativePath = Path.GetRelativePath(_configPath, buff.TemplatePath);
+                            try { archive.CreateEntryFromFile(buff.TemplatePath, relativePath); } catch { }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     private List<SkillConfig> CreateDefaultSkills() =>
     [
