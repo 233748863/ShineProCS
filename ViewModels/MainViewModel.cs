@@ -36,6 +36,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private readonly IImageInterface _imageInterface;
     private readonly GlobalHotkeyService _hotkeyService;
     private readonly TemplateCapture _templateCapture;
+    private Dictionary<string, OpenCvSharp.Mat> _tempTemplateCache; // 临时模板缓存
     private OverlayWindow? _overlay;
     private string _nextSkillName = "";
     private double _currentHpPercent = 100;
@@ -76,6 +77,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
         
         // 初始化模板截取服务
         _templateCapture = new TemplateCapture(_imageInterface);
+        
+        // 临时模板缓存（用于测试匹配）
+        _tempTemplateCache = new Dictionary<string, OpenCvSharp.Mat>();
         
         // 初始化全局快捷键服务
         _hotkeyService = new GlobalHotkeyService();
@@ -387,6 +391,13 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _cooldownTimer?.Stop();
         _cooldownTimer = null;
         
+        // 清理临时模板缓存
+        foreach (var mat in _tempTemplateCache.Values)
+        {
+            if (!mat.IsDisposed) mat.Dispose();
+        }
+        _tempTemplateCache.Clear();
+        
         _hotkeyService.Dispose();
         _engine.Stop();
         HideOverlay();
@@ -446,6 +457,128 @@ public partial class MainViewModel : ObservableObject, IDisposable
         else
         {
             ToastManager.Error("截取失败，请检查区域设置", "截取失败");
+        }
+    }
+
+    /// <summary>
+    /// 测试模板匹配（全屏搜索模板位置）
+    /// 首次点击：从框选区域截取临时模板并缓存，然后全屏搜索
+    /// 后续点击：使用缓存的临时模板在当前画面中搜索新位置
+    /// </summary>
+    [RelayCommand]
+    private void TestTemplateMatch(SkillConfig? skill)
+    {
+        if (skill == null) return;
+        
+        if (skill.IconRegion.All(v => v == 0))
+        {
+            ToastManager.Warning("请先设置技能图标区域", "测试失败");
+            return;
+        }
+        
+        try
+        {
+            var region = skill.IconRegion;
+            int x = region[0], y = region[1], w = region[2], h = region[3];
+            string cacheKey = $"{skill.Name}_{x}_{y}_{w}_{h}";
+            
+            OpenCvSharp.Mat? template = null;
+            bool isNewTemplate = false;
+            
+            // 检查是否有缓存的临时模板
+            if (_tempTemplateCache.TryGetValue(cacheKey, out var cachedTemplate) && !cachedTemplate.IsDisposed)
+            {
+                template = cachedTemplate;
+                OnLog($"使用缓存的临时模板进行搜索", 1);
+            }
+            else
+            {
+                // 首次测试：截取模板区域作为临时模板
+                template = _imageInterface.GetScreenRegion(x, y, w, h);
+                if (template == null)
+                {
+                    ToastManager.Error("截图失败，请检查区域设置", "测试失败");
+                    return;
+                }
+                
+                // 清除旧的缓存（如果有）
+                if (_tempTemplateCache.TryGetValue(cacheKey, out var oldTemplate))
+                {
+                    if (!oldTemplate.IsDisposed) oldTemplate.Dispose();
+                    _tempTemplateCache.Remove(cacheKey);
+                }
+                
+                // 缓存新模板（克隆一份，因为原始的可能被回收）
+                _tempTemplateCache[cacheKey] = template.Clone();
+                isNewTemplate = true;
+                OnLog($"已截取临时模板并缓存，开始全屏搜索", 1);
+            }
+            
+            // 等待一小段时间（仅首次截取时）
+            if (isNewTemplate)
+                System.Threading.Thread.Sleep(100);
+            
+            // 全屏截图
+            int screenW = (int)SystemParameters.PrimaryScreenWidth;
+            int screenH = (int)SystemParameters.PrimaryScreenHeight;
+            var fullScreen = _imageInterface.GetScreenRegion(0, 0, screenW, screenH);
+            if (fullScreen == null)
+            {
+                if (isNewTemplate) _imageInterface.ReturnMat(template);
+                ToastManager.Error("全屏截图失败", "测试失败");
+                return;
+            }
+            
+            // 在全屏中查找模板
+            using var result = new OpenCvSharp.Mat();
+            OpenCvSharp.Cv2.MatchTemplate(fullScreen, template, result, OpenCvSharp.TemplateMatchModes.CCoeffNormed);
+            OpenCvSharp.Cv2.MinMaxLoc(result, out _, out double maxVal, out _, out OpenCvSharp.Point maxLoc);
+            
+            // 找到的位置就是屏幕坐标
+            int foundX = maxLoc.X;
+            int foundY = maxLoc.Y;
+            
+            // 释放资源（仅释放首次截取的原始模板，缓存的不释放）
+            if (isNewTemplate) _imageInterface.ReturnMat(template);
+            _imageInterface.ReturnMat(fullScreen);
+            
+            // 显示红色闪烁框标记找到的位置
+            RegionHighlightWindow.ShowHighlight(foundX, foundY, w, h, 5);
+            
+            // 显示结果
+            var coordInfo = $"找到位置: X={foundX}, Y={foundY}, W={w}, H={h}";
+            var offset = Math.Abs(foundX - x) + Math.Abs(foundY - y);
+            
+            OnLog($"模板测试 [{skill.Name}]: 相似度={maxVal:P1}, {coordInfo}, 偏移={offset}px", 1);
+            
+            if (maxVal >= 0.95)
+                ToastManager.Success($"相似度: {maxVal:P1}\n{coordInfo}\n匹配成功，可以截取保存", "测试通过");
+            else if (maxVal >= 0.8)
+                ToastManager.Info($"相似度: {maxVal:P1}\n{coordInfo}", "测试通过");
+            else
+                ToastManager.Warning($"相似度: {maxVal:P1}\n{coordInfo}\n匹配度较低，建议重新框选", "测试警告");
+        }
+        catch (Exception ex)
+        {
+            OnLog($"模板测试异常: {ex.Message}", 2);
+            ToastManager.Error(ex.Message, "测试异常");
+        }
+    }
+    
+    /// <summary>
+    /// 清除指定技能的临时模板缓存（框选新区域时调用）
+    /// </summary>
+    private void ClearTempTemplateCache(SkillConfig skill)
+    {
+        var keysToRemove = _tempTemplateCache.Keys
+            .Where(k => k.StartsWith($"{skill.Name}_"))
+            .ToList();
+        
+        foreach (var key in keysToRemove)
+        {
+            if (_tempTemplateCache.TryGetValue(key, out var mat) && !mat.IsDisposed)
+                mat.Dispose();
+            _tempTemplateCache.Remove(key);
         }
     }
 
@@ -715,6 +848,55 @@ public partial class MainViewModel : ObservableObject, IDisposable
     
     [RelayCommand] private void AddBuffRequirement() { if (SelectedSkill == null) return; SelectedSkill.BuffRequirements.Add(new BuffRequirement { Name = "新Buff", IsRequired = true }); _hasUnsavedChanges = true; }
     [RelayCommand] private void DeleteBuffRequirement(BuffRequirement? b) { if (SelectedSkill != null && b != null) { SelectedSkill.BuffRequirements.Remove(b); _hasUnsavedChanges = true; } }
+    
+    /// <summary>
+    /// 添加释放条件
+    /// </summary>
+    [RelayCommand]
+    private void AddReleaseCondition(SkillConfig? skill)
+    {
+        if (skill == null) return;
+        skill.ShowReleaseCondition = true;
+        _hasUnsavedChanges = true;
+    }
+    
+    /// <summary>
+    /// 移除释放条件
+    /// </summary>
+    [RelayCommand]
+    private void RemoveReleaseCondition(SkillConfig? skill)
+    {
+        if (skill == null) return;
+        skill.ShowReleaseCondition = false;
+        skill.MinHp = 0;
+        skill.MinMp = 0;
+        _hasUnsavedChanges = true;
+    }
+    
+    /// <summary>
+    /// 添加联动配置
+    /// </summary>
+    [RelayCommand]
+    private void AddComboConfig(SkillConfig? skill)
+    {
+        if (skill == null) return;
+        skill.ShowComboConfig = true;
+        _hasUnsavedChanges = true;
+    }
+    
+    /// <summary>
+    /// 移除联动配置
+    /// </summary>
+    [RelayCommand]
+    private void RemoveComboConfig(SkillConfig? skill)
+    {
+        if (skill == null) return;
+        skill.ShowComboConfig = false;
+        skill.PreCastKeyCode = 0;
+        skill.PreCastConditionBuff = "";
+        skill.ComboDelay = 100;
+        _hasUnsavedChanges = true;
+    }
 
     [RelayCommand]
     private void CaptureKey(SkillConfig? skill)
@@ -750,6 +932,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
         
         if (p is SkillConfig sk) 
         { 
+            // 框选新区域时清除临时模板缓存
+            ClearTempTemplateCache(sk);
             sk.IconRegion = arr; 
             OnLog($"设置技能[{sk.Name}]区域: {r.X},{r.Y},{r.Width},{r.Height}", 1);
             ShowRegionPreview(arr, $"技能[{sk.Name}]区域预览", region => sk.IconRegion = region);

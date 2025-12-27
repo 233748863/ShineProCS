@@ -15,6 +15,8 @@
         <utils:InverseBooleanConverter x:Key="InvBool"/>
         <utils:KeyCodeToNameConverter x:Key="KeyToName"/>
         <utils:LogTextColorConverter x:Key="LogColorConverter"/>
+        <utils:BoolToAddRemoveConverter x:Key="BoolToAddRemove"/>
+        <utils:InverseBoolToVisibilityConverter x:Key="InvBoolToVis"/>
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
         <Style x:Key="HintTextStyle" TargetType="TextBlock">
             <Setter Property="FontSize" Value="11"/>
@@ -335,35 +337,59 @@
                                         <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="8,0,0,0">
                                             <ui:Button Content="选择" Height="32" Width="50" Command="{Binding DataContext.SelectTemplateFileCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}"/>
                                             <ui:Button Content="截取" Height="32" Width="50" Margin="4,0,0,0" Command="{Binding DataContext.CaptureSkillTemplateCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}"/>
+                                            <ui:Button Content="测试" Height="32" Width="50" Margin="4,0,0,0" Appearance="Info" Command="{Binding DataContext.TestTemplateMatchCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}" ToolTip="测试模板匹配，显示当前相似度"/>
                                         </StackPanel>
                                     </Grid>
                                     
-                                    <!-- 释放条件 -->
-                                    <TextBlock Text="释放条件" FontWeight="Bold" Margin="0,8,0,0"/>
+                                    <!-- 释放条件（可选） -->
+                                    <DockPanel Margin="0,8,0,0">
+                                        <TextBlock Text="释放条件" FontWeight="Bold" VerticalAlignment="Center"/>
+                                        <ui:Button Content="添加" Command="{Binding DataContext.AddReleaseConditionCommand, RelativeSource={RelativeSource AncestorType=Window}}" 
+                                                   CommandParameter="{Binding}" Height="28" HorizontalAlignment="Right"
+                                                   Visibility="{Binding ShowReleaseCondition, Converter={StaticResource InvBoolToVis}}"/>
+                                    </DockPanel>
                                     <TextBlock Text="满足条件时才会释放该技能" FontSize="11" Foreground="#999" Margin="0,2,0,4"/>
-                                    <Grid Margin="0,0,0,12"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                                        <StackPanel Margin="0,0,8,0">
-                                            <TextBlock Text="最低HP%" FontWeight="SemiBold" Margin="0,0,0,4"/>
-                                            <ui:TextBox Text="{Binding MinHp}"/>
-                                            <TextBlock Text="血量低于此值时才释放，0=不限制" FontSize="11" Foreground="#999" Margin="0,2,0,0"/>
-                                        </StackPanel>
-                                        <StackPanel Grid.Column="1" Margin="8,0,0,0">
-                                            <TextBlock Text="最低MP%" FontWeight="SemiBold" Margin="0,0,0,4"/>
-                                            <ui:TextBox Text="{Binding MinMp}"/>
-                                            <TextBlock Text="蓝量低于此值时才释放，0=不限制" FontSize="11" Foreground="#999" Margin="0,2,0,0"/>
-                                        </StackPanel>
-                                    </Grid>
-
-                                    <!-- 联动配置 -->
-                                    <TextBlock Text="联动配置（技能连招）" FontWeight="Bold" Margin="0,8,0,0"/>
-                                    <TextBlock Text="场景：当角色缺少某个Buff时，自动先释放前置技能获取Buff，再释放本技能" FontSize="11" Foreground="#999" Margin="0,2,0,4"/>
-                                    <Border Background="#222" CornerRadius="4" Padding="12" Margin="0,0,0,12">
+                                    <Border Background="#222" CornerRadius="4" Padding="12" Margin="0,0,0,8" Visibility="{Binding ShowReleaseCondition, Converter={StaticResource BoolToVis}}">
                                         <StackPanel>
+                                            <DockPanel Margin="0,0,0,8">
+                                                <ui:Button Content="删除" Command="{Binding DataContext.RemoveReleaseConditionCommand, RelativeSource={RelativeSource AncestorType=Window}}" 
+                                                           CommandParameter="{Binding}" Height="28" HorizontalAlignment="Right"/>
+                                            </DockPanel>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                                <StackPanel Margin="0,0,8,0">
+                                                    <TextBlock Text="最低HP%" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                                                    <ui:TextBox Text="{Binding MinHp}"/>
+                                                    <TextBlock Text="血量低于此值时才释放，0=不限制" FontSize="11" Foreground="#999" Margin="0,2,0,0"/>
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                                                    <TextBlock Text="最低MP%" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                                                    <ui:TextBox Text="{Binding MinMp}"/>
+                                                    <TextBlock Text="蓝量低于此值时才释放，0=不限制" FontSize="11" Foreground="#999" Margin="0,2,0,0"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- 联动配置（可选） -->
+                                    <DockPanel Margin="0,8,0,0">
+                                        <TextBlock Text="联动配置（技能连招）" FontWeight="Bold" VerticalAlignment="Center"/>
+                                        <ui:Button Content="添加" Command="{Binding DataContext.AddComboConfigCommand, RelativeSource={RelativeSource AncestorType=Window}}" 
+                                                   CommandParameter="{Binding}" Height="28" HorizontalAlignment="Right"
+                                                   Visibility="{Binding ShowComboConfig, Converter={StaticResource InvBoolToVis}}"/>
+                                    </DockPanel>
+                                    <TextBlock Text="缺少Buff时自动先释放前置技能" FontSize="11" Foreground="#999" Margin="0,2,0,4"/>
+                                    <Border Background="#222" CornerRadius="4" Padding="12" Margin="0,0,0,8" Visibility="{Binding ShowComboConfig, Converter={StaticResource BoolToVis}}">
+                                        <StackPanel>
+                                            <DockPanel Margin="0,0,0,8">
+                                                <ui:Button Content="删除" Command="{Binding DataContext.RemoveComboConfigCommand, RelativeSource={RelativeSource AncestorType=Window}}" 
+                                                           CommandParameter="{Binding}" Height="28" HorizontalAlignment="Right"/>
+                                            </DockPanel>
                                             <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                                 <StackPanel Grid.Column="0">
                                                     <TextBlock Text="触发条件Buff名称" FontWeight="SemiBold" FontSize="12" Margin="0,0,0,4"/>
                                                     <ui:TextBox Text="{Binding PreCastConditionBuff}" PlaceholderText="例如: 千枝态"/>
-                                                    <TextBlock Text="填写Buff名称，缺少此Buff时触发联动" FontSize="11" Foreground="#999" Margin="0,4,0,0"/>
+                                                    <TextBlock Text="缺少此Buff时触发联动" FontSize="11" Foreground="#999" Margin="0,4,0,0"/>
                                                 </StackPanel>
                                                 <StackPanel Grid.Column="2">
                                                     <TextBlock Text="前置技能按键" FontWeight="SemiBold" FontSize="12" Margin="0,0,0,4"/>
@@ -373,21 +399,13 @@
                                                         </Border>
                                                         <ui:Button Content="设置" Height="32" Margin="8,0,0,0" Command="{Binding DataContext.CapturePreCastKeyCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}"/>
                                                     </StackPanel>
-                                                    <TextBlock Text="缺少Buff时先释放此按键的技能" FontSize="11" Foreground="#999" Margin="0,4,0,0"/>
                                                 </StackPanel>
                                             </Grid>
                                             <StackPanel Margin="0,12,0,0">
                                                 <TextBlock Text="连招延迟 (毫秒)" FontWeight="SemiBold" FontSize="12" Margin="0,0,0,4"/>
                                                 <ui:TextBox Text="{Binding ComboDelay}" Width="150" HorizontalAlignment="Left" PlaceholderText="100"/>
-                                                <TextBlock Text="前置技能释放后等待的时间，再释放本技能" FontSize="11" Foreground="#999" Margin="0,4,0,0"/>
+                                                <TextBlock Text="前置技能释放后等待的时间" FontSize="11" Foreground="#999" Margin="0,4,0,0"/>
                                             </StackPanel>
-                                            <Border Background="#333" CornerRadius="4" Padding="10" Margin="0,12,0,0">
-                                                <StackPanel>
-                                                    <TextBlock Text="💡 示例：赤芍寒香 需要 千枝态 Buff" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource SystemAccentColorPrimaryBrush}"/>
-                                                    <TextBlock Text="触发条件Buff = 千枝态，前置技能 = W键（千枝绽蕊）" FontSize="11" Foreground="#AAA" Margin="0,2,0,0"/>
-                                                    <TextBlock Text="→ 缺少千枝态时，先按W释放千枝绽蕊，等待后再释放赤芍寒香" FontSize="11" Foreground="#AAA" Margin="0,2,0,0"/>
-                                                </StackPanel>
-                                            </Border>
                                         </StackPanel>
                                     </Border>
                                     

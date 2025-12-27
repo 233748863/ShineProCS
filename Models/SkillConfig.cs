@@ -85,6 +85,26 @@ public partial class SkillConfig : ObservableObject
     /// 前置技能释放后等待的时间
     /// </summary>
     [ObservableProperty] private int _comboDelay = 100;
+    
+    /// <summary>
+    /// 是否显示释放条件配置（UI折叠控制）
+    /// </summary>
+    [ObservableProperty] private bool _showReleaseCondition;
+    
+    /// <summary>
+    /// 是否显示联动配置（UI折叠控制）
+    /// </summary>
+    [ObservableProperty] private bool _showComboConfig;
+    
+    /// <summary>
+    /// 检查是否有有效的释放条件配置
+    /// </summary>
+    public bool HasReleaseCondition => MinHp > 0 || MinMp > 0;
+    
+    /// <summary>
+    /// 检查是否有有效的联动配置
+    /// </summary>
+    public bool HasComboConfig => PreCastKeyCode > 0 || !string.IsNullOrEmpty(PreCastConditionBuff);
 }
 
 /// <summary>
