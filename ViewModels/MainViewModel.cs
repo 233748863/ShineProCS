@@ -940,6 +940,48 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand] private void ForceCleanup() { GC.Collect(); GC.WaitForPendingFinalizers(); GC.Collect(); OnLog("内存已清理", 1); }
 
     [RelayCommand]
+    private void CreateProfile()
+    {
+        var name = Microsoft.VisualBasic.Interaction.InputBox("请输入新方案名称:", "新建方案", $"方案{AvailableProfiles.Count}");
+        if (string.IsNullOrWhiteSpace(name)) return;
+        
+        // 检查名称是否已存在
+        if (AvailableProfiles.Contains(name))
+        {
+            ToastManager.Warning($"方案 '{name}' 已存在");
+            return;
+        }
+        
+        // 创建新方案文件（复制当前方案）
+        _config.CreateProfile(name);
+        RefreshProfiles();
+        SelectedProfile = name;
+        OnLog($"已创建方案: {name}", 1);
+        ToastManager.Success($"方案 '{name}' 创建成功");
+    }
+
+    [RelayCommand]
+    private void DeleteProfile()
+    {
+        if (SelectedProfile == "默认")
+        {
+            ToastManager.Warning("默认方案不能删除");
+            return;
+        }
+        
+        var result = System.Windows.MessageBox.Show($"确定要删除方案 '{SelectedProfile}' 吗？\n此操作不可恢复！", "删除方案", 
+            MessageBoxButton.YesNo, MessageBoxImage.Warning);
+        if (result != MessageBoxResult.Yes) return;
+        
+        var deletedName = SelectedProfile;
+        _config.DeleteProfile(SelectedProfile);
+        RefreshProfiles();
+        SelectedProfile = "默认";
+        OnLog($"已删除方案: {deletedName}", 1);
+        ToastManager.Info($"方案 '{deletedName}' 已删除");
+    }
+
+    [RelayCommand]
     private void ExportConfig()
     {
         var dlg = new Microsoft.Win32.SaveFileDialog

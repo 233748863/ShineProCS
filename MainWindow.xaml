@@ -164,13 +164,19 @@
                     <!-- 控制中心 -->
                     <ui:Card Grid.Column="1" Grid.RowSpan="3" VerticalAlignment="Top">
                         <StackPanel>
-                            <TextBlock Text="控制中心" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,16"/>
-                            <ui:Button Content="启动引擎" Command="{Binding StartEngineCommand}" Appearance="Primary" Height="44" Margin="0,0,0,8" HorizontalAlignment="Stretch" IsEnabled="{Binding IsRunning, Converter={StaticResource InvBool}}"/>
-                            <ui:Button Content="暂停/恢复" Command="{Binding PauseEngineCommand}" Height="44" Margin="0,0,0,8" HorizontalAlignment="Stretch" IsEnabled="{Binding IsRunning}"/>
-                            <ui:Button Content="停止引擎" Command="{Binding StopEngineCommand}" Height="44" Margin="0,0,0,8" HorizontalAlignment="Stretch" IsEnabled="{Binding IsRunning}"/>
-                            <Separator Margin="0,16"/>
-                            <TextBlock Text="特殊模式" FontWeight="SemiBold" Margin="0,0,0,8"/>
-                            <ui:Button Command="{Binding ToggleQiQingModeCommand}" Height="36" Margin="0,0,0,8" HorizontalAlignment="Stretch">
+                            <TextBlock Text="控制中心" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,10"/>
+                            <ui:Button Command="{Binding StartEngineCommand}" Appearance="Primary" Height="38" Margin="0,0,0,4" HorizontalAlignment="Stretch" IsEnabled="{Binding IsRunning, Converter={StaticResource InvBool}}" Icon="{ui:SymbolIcon Play24}">
+                                <ui:Button.Content><TextBlock Text="启动引擎" Margin="4,0,0,0"/></ui:Button.Content>
+                            </ui:Button>
+                            <ui:Button Command="{Binding PauseEngineCommand}" Height="38" Margin="0,0,0,4" HorizontalAlignment="Stretch" IsEnabled="{Binding IsRunning}" Icon="{ui:SymbolIcon Pause24}">
+                                <ui:Button.Content><TextBlock Text="暂停/恢复" Margin="4,0,0,0"/></ui:Button.Content>
+                            </ui:Button>
+                            <ui:Button Command="{Binding StopEngineCommand}" Height="38" Margin="0,0,0,4" HorizontalAlignment="Stretch" IsEnabled="{Binding IsRunning}" Icon="{ui:SymbolIcon Stop24}">
+                                <ui:Button.Content><TextBlock Text="停止引擎" Margin="4,0,0,0"/></ui:Button.Content>
+                            </ui:Button>
+                            <Separator Margin="0,8"/>
+                            <TextBlock Text="特殊模式" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                            <ui:Button Command="{Binding ToggleQiQingModeCommand}" Height="32" Margin="0,0,0,2" HorizontalAlignment="Stretch" Icon="{ui:SymbolIcon Sparkle24}">
                                 <ui:Button.Style>
                                     <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
                                         <Setter Property="Content" Value="启用七情模式"/>
@@ -183,15 +189,25 @@
                                     </Style>
                                 </ui:Button.Style>
                             </ui:Button>
-                            <TextBlock Text="Ctrl+Alt+F3 切换" FontSize="10" Foreground="#999" HorizontalAlignment="Center" Margin="0,0,0,8"/>
-                            <Separator Margin="0,8"/>
-                            <ui:Button Content="切换悬浮窗" Command="{Binding ToggleOverlayCommand}" Height="36" Margin="0,0,0,8" HorizontalAlignment="Stretch"/>
-                            <ui:Button Content="重新加载配置" Command="{Binding ReloadConfigCommand}" Height="36" Margin="0,0,0,8" HorizontalAlignment="Stretch"/>
-                            <ui:Button Content="清理内存" Command="{Binding ForceCleanupCommand}" Height="36" Margin="0,0,0,8" HorizontalAlignment="Stretch"/>
-                            <Separator Margin="0,8"/>
-                            <TextBlock Text="配置管理" FontWeight="SemiBold" Margin="0,8,0,8"/>
-                            <ui:Button Content="导出配置" Command="{Binding ExportConfigCommand}" Height="32" Margin="0,0,0,4" HorizontalAlignment="Stretch"/>
-                            <ui:Button Content="导入配置" Command="{Binding ImportConfigCommand}" Height="32" HorizontalAlignment="Stretch"/>
+                            <TextBlock Text="Ctrl+Alt+F3 切换" FontSize="10" Foreground="#999" HorizontalAlignment="Center" Margin="0,0,0,4"/>
+                            <Separator Margin="0,4"/>
+                            <ui:Button Command="{Binding ToggleOverlayCommand}" Height="30" Margin="0,0,0,4" HorizontalAlignment="Stretch" Icon="{ui:SymbolIcon WindowNew20}">
+                                <ui:Button.Content><TextBlock Text="切换悬浮窗" Margin="4,0,0,0"/></ui:Button.Content>
+                            </ui:Button>
+                            <ui:Button Command="{Binding ReloadConfigCommand}" Height="30" Margin="0,0,0,4" HorizontalAlignment="Stretch" Icon="{ui:SymbolIcon ArrowSync20}">
+                                <ui:Button.Content><TextBlock Text="重新加载配置" Margin="4,0,0,0"/></ui:Button.Content>
+                            </ui:Button>
+                            <ui:Button Command="{Binding ForceCleanupCommand}" Height="30" Margin="0,0,0,4" HorizontalAlignment="Stretch" Icon="{ui:SymbolIcon Delete20}">
+                                <ui:Button.Content><TextBlock Text="清理内存" Margin="4,0,0,0"/></ui:Button.Content>
+                            </ui:Button>
+                            <Separator Margin="0,4"/>
+                            <TextBlock Text="配置管理" FontWeight="SemiBold" Margin="0,4,0,4"/>
+                            <ui:Button Command="{Binding ExportConfigCommand}" Height="28" Margin="0,0,0,4" HorizontalAlignment="Stretch" Icon="{ui:SymbolIcon ArrowExportUp20}">
+                                <ui:Button.Content><TextBlock Text="导出配置" Margin="4,0,0,0"/></ui:Button.Content>
+                            </ui:Button>
+                            <ui:Button Command="{Binding ImportConfigCommand}" Height="28" HorizontalAlignment="Stretch" Icon="{ui:SymbolIcon ArrowImport20}">
+                                <ui:Button.Content><TextBlock Text="导入配置" Margin="4,0,0,0"/></ui:Button.Content>
+                            </ui:Button>
                         </StackPanel>
                     </ui:Card>
                 </Grid>
@@ -199,14 +215,23 @@
                 <!-- 技能配置页 -->
                 <Grid x:Name="SkillsPage">
                     <Grid.Style><Style TargetType="Grid"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding ElementName=NavList, Path=SelectedItem.Tag}" Value="skills"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></Grid.Style>
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="300"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="320"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
 
                     <ui:Card Margin="0,0,16,0">
                         <DockPanel>
                             <StackPanel DockPanel.Dock="Top" Margin="0,0,0,8">
                                 <TextBlock Text="技能执行流程" FontSize="16" FontWeight="SemiBold"/>
                                 <TextBlock Text="优先级：从上至下扫描" FontSize="12" Foreground="#999" Margin="0,4,0,0"/>
-                                <ComboBox ItemsSource="{Binding AvailableProfiles}" SelectedItem="{Binding SelectedProfile}" Margin="0,12,0,0"/>
+                                <Grid Margin="0,12,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <ComboBox ItemsSource="{Binding AvailableProfiles}" SelectedItem="{Binding SelectedProfile}"/>
+                                    <ui:Button Grid.Column="1" Content="+" Width="32" Height="32" Margin="4,0,0,0" ToolTip="新建方案" Command="{Binding CreateProfileCommand}"/>
+                                    <ui:Button Grid.Column="2" Content="−" Width="32" Height="32" Margin="4,0,0,0" ToolTip="删除当前方案" Command="{Binding DeleteProfileCommand}"/>
+                                </Grid>
                             </StackPanel>
                             <StackPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
                                 <Grid Margin="0,0,0,4"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>
@@ -234,15 +259,15 @@
                                      utils:DragDropBehavior.EnableDragDrop="True"
                                      utils:DragDropBehavior.DragDropCompleted="SkillListBox_DragDropCompleted">
                                 <ListBox.ItemContainerStyle>
-                                    <Style TargetType="ListBoxItem"><Setter Property="Cursor" Value="Hand"/><Setter Property="ToolTip" Value="拖拽可调整顺序"/></Style>
+                                    <Style TargetType="ListBoxItem"><Setter Property="Cursor" Value="Hand"/><Setter Property="ToolTip" Value="拖拽可调整顺序"/><Setter Property="HorizontalContentAlignment" Value="Stretch"/></Style>
                                 </ListBox.ItemContainerStyle>
-                                <ListBox.ItemTemplate><DataTemplate><Grid Margin="0,4"><Grid.ColumnDefinitions><ColumnDefinition Width="24"/><ColumnDefinition/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <ListBox.ItemTemplate><DataTemplate><Grid Margin="0,4"><Grid.ColumnDefinitions><ColumnDefinition Width="24"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                     <TextBlock Text="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=(ItemsControl.AlternationIndex), StringFormat={}{0}.}" Foreground="#999" FontSize="11" VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="1" Text="{Binding Name}" FontWeight="SemiBold" FontSize="13" VerticalAlignment="Center"/>
-                                    <Border Grid.Column="2" Background="#333" CornerRadius="4" Padding="6,2" Margin="4,0">
-                                        <TextBlock Text="{Binding KeyCode, Converter={StaticResource KeyToName}}" FontSize="10" FontWeight="SemiBold"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding Name}" FontWeight="SemiBold" FontSize="13" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                    <Border Grid.Column="2" Background="#333" CornerRadius="4" Padding="6,2" Margin="4,0" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding KeyCode, Converter={StaticResource KeyToName}}" FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                     </Border>
-                                    <CheckBox Grid.Column="3" IsChecked="{Binding Enabled}" Margin="4,0,0,0"/>
+                                    <CheckBox Grid.Column="3" IsChecked="{Binding Enabled}" Margin="4,0,0,0" VerticalAlignment="Center"/>
                                 </Grid></DataTemplate></ListBox.ItemTemplate>
                             </ListBox>
                         </DockPanel>

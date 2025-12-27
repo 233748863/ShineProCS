@@ -66,6 +66,35 @@ public class ConfigManager
         ConfigChanged?.Invoke(_skillsPath);
     }
 
+    public void CreateProfile(string profileName)
+    {
+        var newPath = Path.Combine(_configPath, $"skills_{profileName}.json");
+        if (File.Exists(newPath)) return;
+        
+        // 复制当前方案到新方案
+        lock (_configLock)
+        {
+            File.Copy(_skillsPath, newPath);
+            _skillsPath = newPath;
+            LoadSkills();
+        }
+        ConfigChanged?.Invoke(_skillsPath);
+    }
+
+    public void DeleteProfile(string profileName)
+    {
+        if (profileName == "默认") return;
+        
+        var path = Path.Combine(_configPath, $"skills_{profileName}.json");
+        if (File.Exists(path))
+        {
+            File.Delete(path);
+        }
+        
+        // 切换回默认方案
+        SwitchProfile("默认");
+    }
+
     public void LoadConfigs()
     {
         lock (_configLock)
