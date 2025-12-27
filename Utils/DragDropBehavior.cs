@@ -221,25 +221,46 @@ public static class DragDropBehavior
     /// </summary>
     private static void CreateDragWindow(ListBoxItem item)
     {
+        // 获取实际内容的大小（排除 ListBoxItem 的 padding/margin）
+        var content = item.Content as FrameworkElement;
+        var actualWidth = content?.ActualWidth ?? item.ActualWidth;
+        var actualHeight = content?.ActualHeight ?? item.ActualHeight;
+        
+        // 限制最大宽度
+        actualWidth = Math.Min(actualWidth, 280);
+        
         // 创建项的视觉副本
         var visual = new VisualBrush(item)
         {
-            Opacity = 0.9,
-            Stretch = Stretch.None
+            Opacity = 0.85,
+            Stretch = Stretch.None,
+            AlignmentX = AlignmentX.Left,
+            AlignmentY = AlignmentY.Top
         };
 
         var border = new Border
         {
-            Width = item.ActualWidth,
-            Height = item.ActualHeight,
-            Background = visual,
-            CornerRadius = new CornerRadius(4),
+            Width = actualWidth,
+            Height = actualHeight + 8, // 加一点高度补偿
+            Background = new SolidColorBrush(Color.FromArgb(240, 45, 45, 45)),
+            BorderBrush = new SolidColorBrush(Color.FromRgb(0, 120, 215)),
+            BorderThickness = new Thickness(2),
+            CornerRadius = new CornerRadius(6),
+            Padding = new Thickness(8, 4, 8, 4),
+            Child = new TextBlock
+            {
+                Text = (item.DataContext as dynamic)?.Name ?? "技能",
+                Foreground = Brushes.White,
+                FontWeight = FontWeights.SemiBold,
+                FontSize = 13,
+                VerticalAlignment = VerticalAlignment.Center
+            },
             Effect = new DropShadowEffect
             {
                 Color = Colors.Black,
-                BlurRadius = 15,
-                ShadowDepth = 5,
-                Opacity = 0.6
+                BlurRadius = 12,
+                ShadowDepth = 3,
+                Opacity = 0.5
             }
         };
 
