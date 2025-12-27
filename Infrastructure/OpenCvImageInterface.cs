@@ -13,11 +13,23 @@ public class OpenCvImageInterface : IImageInterface, IDisposable
     [DllImport("gdi32.dll")] private static extern uint GetPixel(IntPtr hdc, int x, int y);
     [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll", SetLastError = true)] private static extern IntPtr FindWindow(string? lpClassName, string lpWindowName);
+    [DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+    [DllImport("user32.dll")] private static extern bool GetClientRect(IntPtr hWnd, out RECT lpRect);
+    [DllImport("user32.dll")] private static extern bool ClientToScreen(IntPtr hWnd, ref POINT lpPoint);
+    
+    [StructLayout(LayoutKind.Sequential)]
+    private struct RECT { public int Left, Top, Right, Bottom; }
+    
+    [StructLayout(LayoutKind.Sequential)]
+    private struct POINT { public int X, Y; }
 
     private WgcCaptureInterface? _wgc;
     private bool _useWgc;
     private IntPtr _targetHwnd;
     private bool _disposed;
+    
+    // 窗口客户区在屏幕上的位置（用于坐标转换）
+    private int _clientX, _clientY;
     
     // Mat 对象池
     private readonly MatPool _matPool = new(30);
@@ -49,6 +61,10 @@ public class OpenCvImageInterface : IImageInterface, IDisposable
                 return false;
             
             _targetHwnd = hwnd;
+            
+            // 获取窗口客户区在屏幕上的位置
+            UpdateWindowPosition();
+            
             if (_wgc.Initialize(hwnd))
             {
                 _useWgc = true;
@@ -59,6 +75,21 @@ public class OpenCvImageInterface : IImageInterface, IDisposable
         
         _useWgc = false;
         return false;
+    }
+    
+    /// <summary>
+    /// 更新窗口位置（窗口移动后需要调用）
+    /// </summary>
+    public void UpdateWindowPosition()
+    {
+        if (_targetHwnd == IntPtr.Zero) return;
+        
+        var pt = new POINT { X = 0, Y = 0 };
+        if (ClientToScreen(_targetHwnd, ref pt))
+        {
+            _clientX = pt.X;
+            _clientY = pt.Y;
+        }
     }
 
     /// <summary>
@@ -80,15 +111,22 @@ public class OpenCvImageInterface : IImageInterface, IDisposable
         {
             try
             {
-                // 直接使用 WGC 的区域截取功能，避免全屏截图再裁剪
-                var region = _wgc.CaptureRegion(x, y, w, h);
-                if (region != null)
-                    return region;
+                // 将屏幕坐标转换为窗口客户区坐标
+                int clientX = x - _clientX;
+                int clientY = y - _clientY;
+                
+                // 检查坐标是否在窗口范围内
+                if (clientX >= 0 && clientY >= 0)
+                {
+                    var region = _wgc.CaptureRegion(clientX, clientY, w, h);
+                    if (region != null)
+                        return region;
+                }
             }
             catch { }
         }
         
-        // 回退到GDI截图
+        // 回退到GDI截图（使用屏幕坐标）
         return GetScreenRegionGdi(x, y, w, h);
     }
 

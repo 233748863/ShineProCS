@@ -287,6 +287,11 @@ public class SkillLoopEngine
                 loopCount++;
                 if (loopCount % 10 == 0) _adaptiveDelay.IsCombatMode = _stateDetector.DetectCombatState();
                 if (loopCount % 50 == 0 && _memMonitor.AutoCleanupIfNeeded(150)) Log("内存清理完成", 0);
+                
+                // 每100次循环更新窗口位置（以防窗口移动）
+                if (loopCount % 100 == 0 && _image is Infrastructure.OpenCvImageInterface ocv)
+                    ocv.UpdateWindowPosition();
+                
                 var metrics = _perfMonitor.GetMetrics();
                 _adaptiveDelay.Adjust(metrics.AverageResponseTime);
                 NotifyStatus();
