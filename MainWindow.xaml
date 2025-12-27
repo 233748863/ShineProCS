@@ -105,7 +105,7 @@
                             <UniformGrid Columns="4">
                                 <StackPanel><TextBlock Text="状态" Foreground="#999" FontSize="12"/><TextBlock Text="{Binding StatusText}" FontWeight="Bold" FontSize="20" Foreground="{DynamicResource SystemAccentColorPrimaryBrush}"/></StackPanel>
                                 <StackPanel><TextBlock Text="执行次数" Foreground="#999" FontSize="12"/><TextBlock Text="{Binding ExecutionCount}" FontWeight="Bold" FontSize="20"/></StackPanel>
-                                <StackPanel><TextBlock Text="平均响应" Foreground="#999" FontSize="12"/><TextBlock Text="{Binding AvgResponseTime, StringFormat={}{0:F4}s}" FontWeight="Bold" FontSize="20"/></StackPanel>
+                                <StackPanel><TextBlock Text="平均响应" Foreground="#999" FontSize="12"/><TextBlock Text="{Binding AvgResponseTime, StringFormat={}{0:F1}ms}" FontWeight="Bold" FontSize="20"/></StackPanel>
                                 <StackPanel><TextBlock Text="成功率" Foreground="#999" FontSize="12"/><TextBlock Text="{Binding SuccessRate, StringFormat={}{0:F1}%}" FontWeight="Bold" FontSize="20" Foreground="#4CAF50"/></StackPanel>
                             </UniformGrid>
                             <TextBlock Text="{Binding MemoryStats}" Foreground="#999" FontSize="12" Margin="0,8,0,0"/>
