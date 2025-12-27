@@ -1,10 +1,11 @@
 using System.Windows;
 using System.Windows.Input;
 using ShineProCS.Utils;
+using Wpf.Ui.Controls;
 
 namespace ShineProCS.Views;
 
-public partial class KeyCaptureWindow : Window
+public partial class KeyCaptureWindow : FluentWindow
 {
     public int CapturedKeyCode { get; private set; }
     public string CapturedKeyName { get; private set; } = "";

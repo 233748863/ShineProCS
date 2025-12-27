@@ -1,10 +1,11 @@
 using System.Windows;
 using ShineProCS.Utils;
 using ShineProCS.ViewModels;
+using Wpf.Ui.Controls;
 
 namespace ShineProCS;
 
-public partial class MainWindow : Window
+public partial class MainWindow : FluentWindow
 {
     private System.Windows.Forms.NotifyIcon? _trayIcon;
 

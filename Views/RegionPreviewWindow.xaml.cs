@@ -3,10 +3,11 @@ using System.Drawing.Imaging;
 using System.IO;
 using System.Windows;
 using System.Windows.Media.Imaging;
+using Wpf.Ui.Controls;
 
 namespace ShineProCS.Views;
 
-public partial class RegionPreviewWindow : Window
+public partial class RegionPreviewWindow : FluentWindow
 {
     public int[] Region { get; private set; }
 
