@@ -43,8 +43,10 @@ Copy-Item ".\config\skills.json" -Destination $configDefaultDir -Force
 
 # 复制使用说明文档
 Write-Host "复制使用说明文档..." -ForegroundColor Green
-if (Test-Path ".\使用说明.md") {
-    Copy-Item ".\使用说明.md" -Destination $publishDir -Force
+$docFile = Join-Path $PSScriptRoot "使用说明.md"
+if (Test-Path $docFile) {
+    Copy-Item $docFile -Destination $publishDir -Force
+    Write-Host "  已复制: 使用说明.md" -ForegroundColor Gray
 }
 
 # 获取版本号
