@@ -46,9 +46,6 @@ Write-Host "复制使用说明文档..." -ForegroundColor Green
 if (Test-Path ".\使用说明.md") {
     Copy-Item ".\使用说明.md" -Destination $publishDir -Force
 }
-if (Test-Path ".\README.md") {
-    Copy-Item ".\README.md" -Destination $publishDir -Force
-}
 
 # 获取版本号
 $version = (Get-Date -Format "yyyy.MM.dd")
