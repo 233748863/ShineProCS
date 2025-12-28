@@ -583,6 +583,243 @@ public partial class MainViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
+    /// 测试HP检测（智能分析颜色）
+    /// </summary>
+    [RelayCommand]
+    private void TestHpDetection()
+    {
+        var region = AppSettings.HealthBarRegion;
+        if (region.All(v => v == 0))
+        {
+            ToastManager.Warning("请先设置HP条区域", "测试失败");
+            return;
+        }
+        
+        try
+        {
+            // 分析主色调并自动配置
+            var (hueMin, hueMax, satMin, valMin) = AnalyzeBarColor(region);
+            
+            if (hueMin >= 0)
+            {
+                // 判断是红色还是绿色血条
+                if (hueMin <= 20 || hueMin >= 160) // 红色范围
+                {
+                    AppSettings.HealthHueMin = hueMin >= 160 ? 0 : hueMin;
+                    AppSettings.HealthHueMax = hueMin >= 160 ? 180 : Math.Min(hueMax, 20);
+                }
+                else // 其他颜色（绿色等）
+                {
+                    AppSettings.HealthGreenHueMin = hueMin;
+                    AppSettings.HealthGreenHueMax = hueMax;
+                }
+                AppSettings.HealthSatMin = satMin;
+                AppSettings.HealthValMin = valMin;
+                
+                OnLog($"HP颜色自动配置: H={hueMin}-{hueMax}, S>={satMin}, V>={valMin}", 1);
+            }
+            
+            // 使用新配置检测
+            var percent = DetectBarPercent(region, isHealth: true);
+            
+            // 显示高亮框
+            RegionHighlightWindow.ShowHighlight(region[0], region[1], region[2], region[3], 3);
+            
+            OnLog($"HP检测测试: {percent:F1}%", 1);
+            ToastManager.Success($"当前HP: {percent:F1}%\n已自动配置颜色范围\nH={hueMin}-{hueMax}, S>={satMin}, V>={valMin}", "HP检测");
+        }
+        catch (Exception ex)
+        {
+            OnLog($"HP检测异常: {ex.Message}", 2);
+            ToastManager.Error(ex.Message, "检测失败");
+        }
+    }
+    
+    /// <summary>
+    /// 测试MP检测（智能分析颜色）
+    /// </summary>
+    [RelayCommand]
+    private void TestMpDetection()
+    {
+        var region = AppSettings.ManaBarRegion;
+        if (region.All(v => v == 0))
+        {
+            ToastManager.Warning("请先设置MP条区域", "测试失败");
+            return;
+        }
+        
+        try
+        {
+            // 分析主色调并自动配置
+            var (hueMin, hueMax, satMin, valMin) = AnalyzeBarColor(region);
+            
+            if (hueMin >= 0)
+            {
+                AppSettings.ManaHueMin = hueMin;
+                AppSettings.ManaHueMax = hueMax;
+                AppSettings.ManaSatMin = satMin;
+                AppSettings.ManaValMin = valMin;
+                
+                OnLog($"MP颜色自动配置: H={hueMin}-{hueMax}, S>={satMin}, V>={valMin}", 1);
+            }
+            
+            // 使用新配置检测
+            var percent = DetectBarPercent(region, isHealth: false);
+            
+            // 显示高亮框
+            RegionHighlightWindow.ShowHighlight(region[0], region[1], region[2], region[3], 3);
+            
+            OnLog($"MP检测测试: {percent:F1}%", 1);
+            ToastManager.Success($"当前MP: {percent:F1}%\n已自动配置颜色范围\nH={hueMin}-{hueMax}, S>={satMin}, V>={valMin}", "MP检测");
+        }
+        catch (Exception ex)
+        {
+            OnLog($"MP检测异常: {ex.Message}", 2);
+            ToastManager.Error(ex.Message, "检测失败");
+        }
+    }
+    
+    /// <summary>
+    /// 分析区域主色调，返回推荐的HSV范围
+    /// </summary>
+    private (int hueMin, int hueMax, int satMin, int valMin) AnalyzeBarColor(int[] region)
+    {
+        if (region.Length < 4 || region[2] <= 0 || region[3] <= 0)
+            return (-1, -1, -1, -1);
+        
+        var frame = _imageInterface.GetScreenRegion(region[0], region[1], region[2], region[3]);
+        if (frame == null) return (-1, -1, -1, -1);
+        
+        try
+        {
+            using var hsv = new OpenCvSharp.Mat();
+            OpenCvSharp.Cv2.CvtColor(frame, hsv, OpenCvSharp.ColorConversionCodes.BGR2HSV);
+            
+            // 收集所有像素的HSV值
+            var hues = new List<int>();
+            var sats = new List<int>();
+            var vals = new List<int>();
+            
+            var indexer = hsv.GetGenericIndexer<OpenCvSharp.Vec3b>();
+            for (int y = 0; y < hsv.Height; y++)
+            {
+                for (int x = 0; x < hsv.Width; x++)
+                {
+                    var pixel = indexer[y, x];
+                    int h = pixel.Item0; // 0-180
+                    int s = pixel.Item1; // 0-255
+                    int v = pixel.Item2; // 0-255
+                    
+                    // 只统计有颜色的像素（排除灰色/黑色背景）
+                    if (s > 50 && v > 50)
+                    {
+                        hues.Add(h);
+                        sats.Add(s);
+                        vals.Add(v);
+                    }
+                }
+            }
+            
+            if (hues.Count < 10)
+            {
+                OnLog("颜色分析: 有效像素太少，可能框选区域不正确", 2);
+                return (-1, -1, -1, -1);
+            }
+            
+            // 计算色相的众数（主色调）
+            var hueGroups = hues.GroupBy(h => h / 5 * 5) // 按5度分组
+                               .OrderByDescending(g => g.Count())
+                               .First();
+            int dominantHue = hueGroups.Key;
+            
+            // 计算色相范围（主色调 ± 15度）
+            int hueMin = Math.Max(0, dominantHue - 15);
+            int hueMax = Math.Min(180, dominantHue + 20);
+            
+            // 处理红色跨越0度的情况
+            if (dominantHue < 15)
+            {
+                hueMin = 0;
+                hueMax = dominantHue + 15;
+            }
+            else if (dominantHue > 165)
+            {
+                hueMin = dominantHue - 15;
+                hueMax = 180;
+            }
+            
+            // 计算饱和度和明度的下限（取较低的百分位数）
+            sats.Sort();
+            vals.Sort();
+            int satMin = Math.Max(30, sats[(int)(sats.Count * 0.1)]); // 10%分位数
+            int valMin = Math.Max(30, vals[(int)(vals.Count * 0.1)]);
+            
+            OnLog($"颜色分析完成: 主色调H={dominantHue}, 有效像素={hues.Count}", 1);
+            
+            return (hueMin, hueMax, satMin, valMin);
+        }
+        finally
+        {
+            _imageInterface.ReturnMat(frame);
+        }
+    }
+    
+    /// <summary>
+    /// 检测血条/蓝条百分比（复用StateDetector的逻辑）
+    /// </summary>
+    private double DetectBarPercent(int[] region, bool isHealth)
+    {
+        if (region.Length < 4 || region[2] <= 0 || region[3] <= 0)
+            return 100.0;
+        
+        var frame = _imageInterface.GetScreenRegion(region[0], region[1], region[2], region[3]);
+        if (frame == null) return 100.0;
+        
+        try
+        {
+            using var hsv = new OpenCvSharp.Mat();
+            OpenCvSharp.Cv2.CvtColor(frame, hsv, OpenCvSharp.ColorConversionCodes.BGR2HSV);
+            
+            using var mask = new OpenCvSharp.Mat();
+            if (isHealth)
+            {
+                using var maskRed = new OpenCvSharp.Mat();
+                using var maskGreen = new OpenCvSharp.Mat();
+                
+                // 红色血条
+                OpenCvSharp.Cv2.InRange(hsv, 
+                    new OpenCvSharp.Scalar(AppSettings.HealthHueMin, AppSettings.HealthSatMin, AppSettings.HealthValMin), 
+                    new OpenCvSharp.Scalar(AppSettings.HealthHueMax, 255, 255), 
+                    maskRed);
+                // 绿色血条
+                OpenCvSharp.Cv2.InRange(hsv, 
+                    new OpenCvSharp.Scalar(AppSettings.HealthGreenHueMin, AppSettings.HealthSatMin, AppSettings.HealthValMin), 
+                    new OpenCvSharp.Scalar(AppSettings.HealthGreenHueMax, 255, 255), 
+                    maskGreen);
+                OpenCvSharp.Cv2.BitwiseOr(maskRed, maskGreen, mask);
+            }
+            else
+            {
+                // 蓝色蓝条
+                OpenCvSharp.Cv2.InRange(hsv, 
+                    new OpenCvSharp.Scalar(AppSettings.ManaHueMin, AppSettings.ManaSatMin, AppSettings.ManaValMin), 
+                    new OpenCvSharp.Scalar(AppSettings.ManaHueMax, 255, 255), 
+                    mask);
+            }
+            
+            var nonZero = OpenCvSharp.Cv2.CountNonZero(mask);
+            var total = frame.Width * frame.Height;
+            var percent = (double)nonZero / total * 100.0;
+            
+            return Math.Min(100.0, Math.Max(0.0, percent));
+        }
+        finally
+        {
+            _imageInterface.ReturnMat(frame);
+        }
+    }
+
+    /// <summary>
     /// 一键截取Buff模板
     /// </summary>
     [RelayCommand]
