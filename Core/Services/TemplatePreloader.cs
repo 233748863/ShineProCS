@@ -43,13 +43,13 @@ public class TemplatePreloader : IDisposable
         {
             if (!string.IsNullOrEmpty(skill.TemplatePath))
                 paths.Add(skill.TemplatePath);
-            
-            // 收集Buff模板路径
-            foreach (var buff in skill.BuffRequirements)
-            {
-                if (!string.IsNullOrEmpty(buff.TemplatePath))
-                    paths.Add(buff.TemplatePath);
-            }
+        }
+        
+        // 收集Buff库模板路径
+        foreach (var buff in config.AppSettings.BuffLibrary)
+        {
+            if (!string.IsNullOrEmpty(buff.TemplatePath))
+                paths.Add(buff.TemplatePath);
         }
         
         return PreloadTemplates(paths);

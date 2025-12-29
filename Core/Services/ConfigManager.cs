@@ -176,7 +176,6 @@ public class ConfigManager
                 {
                     foreach (var skill in _skills)
                     {
-                        skill.BuffRequirements ??= [];
                         ValidateAndFixSkillConfig(skill);
                     }
                 }
@@ -203,25 +202,21 @@ public class ConfigManager
     /// </summary>
     private void ValidateAndFixAppSettings(AppSettings settings)
     {
-        // 修正循环间隔
         if (settings.LoopInterval < 10)
             settings.LoopInterval = 10;
         else if (settings.LoopInterval > 5000)
             settings.LoopInterval = 5000;
         
-        // 修正图像队列容量
         if (settings.ImageQueueCapacity < 2)
             settings.ImageQueueCapacity = 2;
         else if (settings.ImageQueueCapacity > 10)
             settings.ImageQueueCapacity = 10;
         
-        // 修正日志级别
         if (settings.LogLevel < 0)
             settings.LogLevel = 0;
         else if (settings.LogLevel > 3)
             settings.LogLevel = 3;
         
-        // 修正区域数组长度
         if (settings.DetectionRegion.Length != 4)
             settings.DetectionRegion = [0, 0, 100, 100];
         if (settings.ManaBarRegion.Length != 4)
@@ -231,53 +226,11 @@ public class ConfigManager
         if (settings.GlobalCdPoint.Length != 2)
             settings.GlobalCdPoint = [0, 0];
         
-        // 修正按键码
-        if (settings.QianZhiKeyCode < 0 || settings.QianZhiKeyCode > 255)
-            settings.QianZhiKeyCode = 87; // W键
-    }
-
-    /// <summary>
-    /// 验证并修正 SkillConfig
-    /// </summary>
-    private void ValidateAndFixSkillConfig(SkillConfig skill)
-    {
-        // 修正按键码
-        if (skill.KeyCode < 0 || skill.KeyCode > 255)
-            skill.KeyCode = 49; // 1键
+        // 确保BuffLibrary已初始化
+        settings.BuffLibrary ??= [];
         
-        // 修正优先级
-        if (skill.Priority < 0)
-            skill.Priority = 0;
-        
-        // 修正相似度阈值
-        if (skill.SimilarityThreshold < 0)
-            skill.SimilarityThreshold = 0;
-        else if (skill.SimilarityThreshold > 1)
-            skill.SimilarityThreshold = 1;
-        
-        // 修正 HP/MP 范围
-        if (skill.MinHp < 0) skill.MinHp = 0;
-        else if (skill.MinHp > 100) skill.MinHp = 100;
-        
-        if (skill.MinMp < 0) skill.MinMp = 0;
-        else if (skill.MinMp > 100) skill.MinMp = 100;
-        
-        // 修正区域数组
-        if (skill.IconRegion.Length != 4)
-            skill.IconRegion = [0, 0, 0, 0];
-        
-        // 修正连招延迟
-        if (skill.ComboDelay < 0)
-            skill.ComboDelay = 0;
-        else if (skill.ComboDelay > 5000)
-            skill.ComboDelay = 5000;
-        
-        // 修正前置按键码
-        if (skill.PreCastKeyCode < 0 || skill.PreCastKeyCode > 255)
-            skill.PreCastKeyCode = 0;
-        
-        // 验证 Buff 配置
-        foreach (var buff in skill.BuffRequirements)
+        // 验证BuffLibrary中的每个Buff
+        foreach (var buff in settings.BuffLibrary)
         {
             if (buff.IconRegion.Length != 4)
                 buff.IconRegion = [0, 0, 0, 0];
@@ -287,6 +240,40 @@ public class ConfigManager
             else if (buff.SimilarityThreshold > 1)
                 buff.SimilarityThreshold = 1;
         }
+    }
+
+    /// <summary>
+    /// 验证并修正 SkillConfig
+    /// </summary>
+    private void ValidateAndFixSkillConfig(SkillConfig skill)
+    {
+        if (skill.KeyCode < 0 || skill.KeyCode > 255)
+            skill.KeyCode = 49;
+        
+        if (skill.Priority < 0)
+            skill.Priority = 0;
+        
+        if (skill.SimilarityThreshold < 0)
+            skill.SimilarityThreshold = 0;
+        else if (skill.SimilarityThreshold > 1)
+            skill.SimilarityThreshold = 1;
+        
+        if (skill.MinHp < 0) skill.MinHp = 0;
+        else if (skill.MinHp > 100) skill.MinHp = 100;
+        
+        if (skill.MinMp < 0) skill.MinMp = 0;
+        else if (skill.MinMp > 100) skill.MinMp = 100;
+        
+        if (skill.IconRegion.Length != 4)
+            skill.IconRegion = [0, 0, 0, 0];
+        
+        if (skill.ComboDelay < 0)
+            skill.ComboDelay = 0;
+        else if (skill.ComboDelay > 5000)
+            skill.ComboDelay = 5000;
+        
+        if (skill.PreCastKeyCode < 0 || skill.PreCastKeyCode > 255)
+            skill.PreCastKeyCode = 0;
     }
 
     /// <summary>
@@ -352,12 +339,6 @@ public class ConfigManager
                     // 检查模板文件
                     if (!string.IsNullOrEmpty(skill.TemplatePath) && !File.Exists(skill.TemplatePath))
                         result.Warnings.Add($"技能[{skill.Name}]的模板文件不存在: {skill.TemplatePath}");
-                    
-                    foreach (var buff in skill.BuffRequirements)
-                    {
-                        if (!string.IsNullOrEmpty(buff.TemplatePath) && !File.Exists(buff.TemplatePath))
-                            result.Warnings.Add($"Buff[{buff.Name}]的模板文件不存在: {buff.TemplatePath}");
-                    }
                 }
                 
                 // 报告按键冲突
@@ -544,15 +525,6 @@ public class ConfigManager
                     {
                         var relativePath = Path.GetRelativePath(_configPath, skill.TemplatePath);
                         try { archive.CreateEntryFromFile(skill.TemplatePath, relativePath); } catch { }
-                    }
-                    
-                    foreach (var buff in skill.BuffRequirements)
-                    {
-                        if (!string.IsNullOrEmpty(buff.TemplatePath) && File.Exists(buff.TemplatePath))
-                        {
-                            var relativePath = Path.GetRelativePath(_configPath, buff.TemplatePath);
-                            try { archive.CreateEntryFromFile(buff.TemplatePath, relativePath); } catch { }
-                        }
                     }
                 }
             }

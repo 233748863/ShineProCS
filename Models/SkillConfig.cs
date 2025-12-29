@@ -1,4 +1,3 @@
-using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace ShineProCS.Models;
@@ -65,18 +64,13 @@ public partial class SkillConfig : ObservableObject
     [ObservableProperty] private double _cooldown;
     
     /// <summary>
-    /// Buff依赖列表
-    /// </summary>
-    [ObservableProperty] private ObservableCollection<BuffRequirement> _buffRequirements = [];
-    
-    /// <summary>
     /// 前置技能按键码（联动技能）
     /// 当Buff条件不满足时，先释放此按键对应的技能
     /// </summary>
     [ObservableProperty] private int _preCastKeyCode;
     
     /// <summary>
-    /// 前置技能触发条件Buff名称
+    /// 前置技能触发条件Buff名称（引用Buff库中的Buff）
     /// </summary>
     [ObservableProperty] private string _preCastConditionBuff = "";
     
@@ -87,12 +81,12 @@ public partial class SkillConfig : ObservableObject
     [ObservableProperty] private int _comboDelay = 100;
     
     /// <summary>
-    /// 是否显示释放条件配置（UI折叠控制）
+    /// 是否显示释放条件配置面板（UI状态）
     /// </summary>
     [ObservableProperty] private bool _showReleaseCondition;
     
     /// <summary>
-    /// 是否显示联动配置（UI折叠控制）
+    /// 是否显示联动配置面板（UI状态）
     /// </summary>
     [ObservableProperty] private bool _showComboConfig;
     
@@ -105,43 +99,4 @@ public partial class SkillConfig : ObservableObject
     /// 检查是否有有效的联动配置
     /// </summary>
     public bool HasComboConfig => PreCastKeyCode > 0 || !string.IsNullOrEmpty(PreCastConditionBuff);
-}
-
-/// <summary>
-/// Buff依赖配置
-/// 定义技能释放所需的Buff条件
-/// </summary>
-public partial class BuffRequirement : ObservableObject
-{
-    /// <summary>
-    /// Buff名称
-    /// </summary>
-    [ObservableProperty] private string _name = "";
-    
-    /// <summary>
-    /// Buff图标检测区域 [X, Y, Width, Height]
-    /// </summary>
-    [ObservableProperty] private int[] _iconRegion = [0, 0, 0, 0];
-    
-    /// <summary>
-    /// Buff图标模板图片路径
-    /// </summary>
-    [ObservableProperty] private string _templatePath = "";
-    
-    /// <summary>
-    /// 模板匹配相似度阈值 (0.0-1.0)
-    /// </summary>
-    [ObservableProperty] private double _similarityThreshold = 0.8;
-    
-    /// <summary>
-    /// 是否为Debuff（负面效果）
-    /// </summary>
-    [ObservableProperty] private bool _isDebuff;
-    
-    /// <summary>
-    /// 是否要求Buff存在
-    /// true: 需要Buff存在才能释放技能
-    /// false: 需要Buff不存在才能释放技能
-    /// </summary>
-    [ObservableProperty] private bool _isRequired = true;
 }

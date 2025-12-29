@@ -35,6 +35,16 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private readonly SkillLoopEngine _engine;
     private readonly IImageInterface _imageInterface;
     private readonly GlobalHotkeyService _hotkeyService;
+    
+    /// <summary>
+    /// 公开图像接口供其他组件使用（如SkillConfigPage）
+    /// </summary>
+    public IImageInterface ImageInterface => _imageInterface;
+    
+    /// <summary>
+    /// 公开ConfigManager供其他组件使用（如BuffLibraryPage）
+    /// </summary>
+    public ConfigManager ConfigManager => _config;
     private readonly TemplateCapture _templateCapture;
     private Dictionary<string, OpenCvSharp.Mat> _tempTemplateCache; // 临时模板缓存
     private OverlayWindow? _overlay;
@@ -47,7 +57,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     [ObservableProperty] private bool _isRunning;
     [ObservableProperty] private bool _isPaused;
-    [ObservableProperty] private bool _isQiQingMode;
     [ObservableProperty] private string _statusText = "已停止";
     [ObservableProperty] private int _executionCount;
     [ObservableProperty] private double _avgResponseTime;
@@ -61,7 +70,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private AppSettings _appSettings;
     [ObservableProperty] private ObservableCollection<SkillStatusItem> _skillStatusList = [];
     [ObservableProperty] private bool _showGuideTip;
-    [ObservableProperty] private string _hotkeyStatus = ""; // 快捷键状态显示
+    [ObservableProperty] private string _hotkeyStatus = "";
 
     public MainViewModel()
     {
@@ -75,13 +84,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _engine.StatusChanged += OnStatusChanged;
         _engine.LogMessage += OnLog;
         
-        // 初始化模板截取服务
         _templateCapture = new TemplateCapture(_imageInterface);
-        
-        // 临时模板缓存（用于测试匹配）
         _tempTemplateCache = new Dictionary<string, OpenCvSharp.Mat>();
         
-        // 初始化全局快捷键服务
         _hotkeyService = new GlobalHotkeyService();
         _hotkeyService.HotkeyTriggered += OnHotkeyTriggered;
 
@@ -96,25 +101,18 @@ public partial class MainViewModel : ObservableObject, IDisposable
             ShowOverlay();
     }
 
-    /// <summary>
-    /// 初始化全局快捷键（需要在窗口加载后调用）
-    /// </summary>
     public void InitializeHotkeys(Window window)
     {
         _hotkeyService.Initialize(window);
         RegisterHotkeys();
     }
 
-    /// <summary>
-    /// 注册所有快捷键
-    /// </summary>
     private void RegisterHotkeys()
     {
         if (!AppSettings.EnableGlobalHotkeys) return;
         
         var registered = new List<string>();
         
-        // 启动/停止快捷键
         if (_hotkeyService.RegisterHotkey("StartStop", 
             AppSettings.HotkeyStartStopModifier, 
             AppSettings.HotkeyStartStopKey, 
@@ -124,7 +122,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 AppSettings.HotkeyStartStopModifier, AppSettings.HotkeyStartStopKey));
         }
         
-        // 暂停快捷键
         if (_hotkeyService.RegisterHotkey("Pause",
             AppSettings.HotkeyPauseModifier,
             AppSettings.HotkeyPauseKey,
@@ -134,16 +131,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 AppSettings.HotkeyPauseModifier, AppSettings.HotkeyPauseKey));
         }
         
-        // 七情模式快捷键
-        if (_hotkeyService.RegisterHotkey("QiQing",
-            AppSettings.HotkeyQiQingModifier,
-            AppSettings.HotkeyQiQingKey,
-            () => ToggleQiQingMode()))
-        {
-            registered.Add(GlobalHotkeyService.GetHotkeyDisplayText(
-                AppSettings.HotkeyQiQingModifier, AppSettings.HotkeyQiQingKey));
-        }
-        
         if (registered.Count > 0)
         {
             HotkeyStatus = $"快捷键: {string.Join(", ", registered)}";
@@ -151,9 +138,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
     }
 
-    /// <summary>
-    /// 快捷键触发回调
-    /// </summary>
     private void OnHotkeyTriggered(string name)
     {
         System.Windows.Application.Current?.Dispatcher.Invoke(() =>
@@ -231,7 +215,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 else StartEngine();
             };
             _overlay.OnPauseRequested += () => PauseEngine();
-            _overlay.OnQiQingToggleRequested += () => ToggleQiQingMode();
             _overlay.OnHideRequested += () => HideOverlay();
             
             // 配置方案切换
@@ -262,7 +245,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
         {
             _overlay.OnStartStopRequested -= () => { };
             _overlay.OnPauseRequested -= () => { };
-            _overlay.OnQiQingToggleRequested -= () => { };
             _overlay.OnHideRequested -= () => { };
             _overlay.Close();
             _overlay = null;
@@ -299,7 +281,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
         {
             IsRunning = s.IsRunning; IsPaused = s.IsPaused; StatusText = s.Mode;
             ExecutionCount = s.ExecutionCount; AvgResponseTime = s.AvgResponseTime; SuccessRate = s.SuccessRate;
-            IsQiQingMode = s.IsQiQingInLoop;
             
             // 获取下一个技能名称
             _nextSkillName = s.NextSkillName ?? "";
@@ -308,7 +289,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             
             // 更新悬浮窗
             _overlay?.UpdateStatus(s.Mode, s.ExecutionCount, s.AvgResponseTime * 1000, 
-                s.IsQianZhiActive, s.IsQiQingInLoop, _nextSkillName, _currentHpPercent, _currentMpPercent);
+                _nextSkillName, _currentHpPercent, _currentMpPercent);
             
             // 更新技能状态列表
             UpdateSkillStatusFromEngine(s);
@@ -408,21 +389,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand] private void StartEngine() => _engine.Start();
     [RelayCommand] private void StopEngine() => _engine.Stop();
     [RelayCommand] private void PauseEngine() => _engine.TogglePause();
-    
-    [RelayCommand] 
-    private void ToggleQiQingMode() 
-    { 
-        if (_engine.IsQiQingInLoop)
-        {
-            _engine.DisableQiQingLoop();
-            IsQiQingMode = false;
-        }
-        else
-        {
-            _engine.EnableQiQingLoop();
-            IsQiQingMode = true;
-        }
-    }
     
     [RelayCommand] 
     private void ToggleOverlay() 
@@ -820,10 +786,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// 一键截取Buff模板
+    /// 一键截取Buff模板（用于Buff库）
     /// </summary>
     [RelayCommand]
-    private void CaptureBuffTemplate(BuffRequirement? buff)
+    private void CaptureBuffTemplate(BuffConfig? buff)
     {
         if (buff == null) return;
         
@@ -925,20 +891,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
             PreCastConditionBuff = SelectedSkill.PreCastConditionBuff,
             ComboDelay = SelectedSkill.ComboDelay
         };
-        
-        // 复制 Buff 依赖
-        foreach (var buff in SelectedSkill.BuffRequirements)
-        {
-            copy.BuffRequirements.Add(new BuffRequirement
-            {
-                Name = buff.Name,
-                IconRegion = (int[])buff.IconRegion.Clone(),
-                TemplatePath = buff.TemplatePath,
-                SimilarityThreshold = buff.SimilarityThreshold,
-                IsDebuff = buff.IsDebuff,
-                IsRequired = buff.IsRequired
-            });
-        }
         
         var index = Skills.IndexOf(SelectedSkill);
         Skills.Insert(index + 1, copy);
@@ -1083,9 +1035,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
     }
     
-    [RelayCommand] private void AddBuffRequirement() { if (SelectedSkill == null) return; SelectedSkill.BuffRequirements.Add(new BuffRequirement { Name = "新Buff", IsRequired = true }); _hasUnsavedChanges = true; }
-    [RelayCommand] private void DeleteBuffRequirement(BuffRequirement? b) { if (SelectedSkill != null && b != null) { SelectedSkill.BuffRequirements.Remove(b); _hasUnsavedChanges = true; } }
-    
     /// <summary>
     /// 添加释放条件
     /// </summary>
@@ -1175,7 +1124,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             OnLog($"设置技能[{sk.Name}]区域: {r.X},{r.Y},{r.Width},{r.Height}", 1);
             ShowRegionPreview(arr, $"技能[{sk.Name}]区域预览", region => sk.IconRegion = region);
         }
-        else if (p is BuffRequirement bf) 
+        else if (p is BuffConfig bf) 
         { 
             bf.IconRegion = arr; 
             OnLog($"设置Buff[{bf.Name}]区域: {r.X},{r.Y},{r.Width},{r.Height}", 1);
@@ -1229,7 +1178,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     }
 
     [RelayCommand]
-    private void PreviewBuffRegion(BuffRequirement? buff)
+    private void PreviewBuffRegion(BuffConfig? buff)
     {
         if (buff == null) return;
         ShowRegionPreview(buff.IconRegion, $"Buff[{buff.Name}]区域预览", region => buff.IconRegion = region);
@@ -1275,7 +1224,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         var dlg = new Microsoft.Win32.OpenFileDialog { Filter = "图片|*.png;*.jpg;*.bmp|所有|*.*", Title = "选择模板" };
         if (dlg.ShowDialog() != true) return;
         if (p is SkillConfig sk) { sk.TemplatePath = dlg.FileName; OnLog($"设置技能[{sk.Name}]模板", 1); }
-        else if (p is BuffRequirement bf) { bf.TemplatePath = dlg.FileName; OnLog($"设置Buff[{bf.Name}]模板", 1); }
+        else if (p is BuffConfig bf) { bf.TemplatePath = dlg.FileName; OnLog($"设置Buff[{bf.Name}]模板", 1); }
     }
 
     [RelayCommand] 
@@ -1412,15 +1361,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
         set { AppSettings.HotkeyPauseModifier = IndexToModifier(value); OnPropertyChanged(); }
     }
 
-    /// <summary>
-    /// 七情模式快捷键修饰键索引
-    /// </summary>
-    public int QiQingModifierIndex
-    {
-        get => ModifierToIndex(AppSettings.HotkeyQiQingModifier);
-        set { AppSettings.HotkeyQiQingModifier = IndexToModifier(value); OnPropertyChanged(); }
-    }
-
     private static int ModifierToIndex(uint modifier) => modifier switch
     {
         0 => 0,  // 无
@@ -1456,9 +1396,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 break;
             case "Pause":
                 AppSettings.HotkeyPauseKey = keyCode;
-                break;
-            case "QiQing":
-                AppSettings.HotkeyQiQingKey = keyCode;
                 break;
         }
         
@@ -1497,15 +1434,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
             
             if (skill.ComboDelay < 0)
                 errors.Add($"技能[{skill.Name}]连招延迟不能为负数");
-            
-            foreach (var buff in skill.BuffRequirements)
-            {
-                if (string.IsNullOrWhiteSpace(buff.Name))
-                    errors.Add($"技能[{skill.Name}]的Buff名称不能为空");
-                
-                if (buff.IconRegion.Any(v => v < 0))
-                    errors.Add($"技能[{skill.Name}]的Buff[{buff.Name}]区域坐标不能为负数");
-            }
         }
         
         if (AppSettings.LoopInterval < 10)

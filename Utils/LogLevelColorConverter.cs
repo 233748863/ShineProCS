@@ -92,7 +92,7 @@ public class LogTextColorConverter : IValueConverter
             return SuccessBrush;
         
         // 联动/高亮类
-        if (text.Contains("联动") || text.Contains("千枝") || text.Contains("七情") || text.Contains("气劲"))
+        if (text.Contains("联动") || text.Contains("Buff"))
             return HighlightBrush;
         
         // 调试类

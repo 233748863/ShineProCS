@@ -1,0 +1,234 @@
+<UserControl x:Class="ShineProCS.Views.SkillCardControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:utils="clr-namespace:ShineProCS.Utils">
+    
+    <UserControl.Resources>
+        <utils:KeyCodeToNameConverter x:Key="KeyToName"/>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+        
+        <!-- 展开动画 -->
+        <Storyboard x:Key="ExpandStoryboard">
+            <DoubleAnimation Storyboard.TargetName="ContentPanel" 
+                             Storyboard.TargetProperty="(FrameworkElement.LayoutTransform).(ScaleTransform.ScaleY)"
+                             From="0" To="1" Duration="0:0:0.2">
+                <DoubleAnimation.EasingFunction>
+                    <CubicEase EasingMode="EaseOut"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation Storyboard.TargetName="ContentPanel" 
+                             Storyboard.TargetProperty="Opacity"
+                             From="0" To="1" Duration="0:0:0.2"/>
+            <DoubleAnimation Storyboard.TargetName="ExpandIconRotate" 
+                             Storyboard.TargetProperty="Angle"
+                             To="90" Duration="0:0:0.15">
+                <DoubleAnimation.EasingFunction>
+                    <CubicEase EasingMode="EaseOut"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+        </Storyboard>
+        
+        <!-- 折叠动画 -->
+        <Storyboard x:Key="CollapseStoryboard">
+            <DoubleAnimation Storyboard.TargetName="ContentPanel" 
+                             Storyboard.TargetProperty="(FrameworkElement.LayoutTransform).(ScaleTransform.ScaleY)"
+                             From="1" To="0" Duration="0:0:0.15">
+                <DoubleAnimation.EasingFunction>
+                    <CubicEase EasingMode="EaseIn"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation Storyboard.TargetName="ContentPanel" 
+                             Storyboard.TargetProperty="Opacity"
+                             From="1" To="0" Duration="0:0:0.15"/>
+            <DoubleAnimation Storyboard.TargetName="ExpandIconRotate" 
+                             Storyboard.TargetProperty="Angle"
+                             To="0" Duration="0:0:0.15">
+                <DoubleAnimation.EasingFunction>
+                    <CubicEase EasingMode="EaseIn"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+        </Storyboard>
+    </UserControl.Resources>
+    
+    <Border Background="#252525" CornerRadius="8" Margin="0,0,0,8">
+        <StackPanel>
+            <!-- 卡片头部 -->
+            <Border Background="#2a2a2a" CornerRadius="8,8,0,0" Padding="12,10" Cursor="Hand" MouseLeftButtonUp="Header_Click">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    
+                    <TextBlock x:Name="ExpandIcon" Text="▶" FontSize="10" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="#888" RenderTransformOrigin="0.5,0.5">
+                        <TextBlock.RenderTransform>
+                            <RotateTransform x:Name="ExpandIconRotate" Angle="0"/>
+                        </TextBlock.RenderTransform>
+                    </TextBlock>
+                    
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="14"/>
+                        <!-- 配置状态指示 -->
+                        <TextBlock x:Name="ConfigStatusIcon" Text="✓" Foreground="#4CAF50" FontSize="12" Margin="8,0,0,0" Visibility="Collapsed" ToolTip="已配置"/>
+                        <TextBlock x:Name="ConfigWarningIcon" Text="⚠" Foreground="#FF9800" FontSize="12" Margin="8,0,0,0" ToolTip="未完成配置"/>
+                    </StackPanel>
+                    
+                    <Border Grid.Column="2" Background="#333" CornerRadius="4" Padding="10,4" Margin="8,0">
+                        <TextBlock Text="{Binding KeyCode, Converter={StaticResource KeyToName}}" FontSize="12" FontWeight="Bold" 
+                                   Foreground="{DynamicResource SystemAccentColorPrimaryBrush}"/>
+                    </Border>
+                    
+                    <CheckBox Grid.Column="3" IsChecked="{Binding Enabled}" VerticalAlignment="Center" Click="EnabledCheckBox_Click"/>
+                    
+                    <!-- 快捷操作按钮 -->
+                    <StackPanel Grid.Column="4" Orientation="Horizontal" Margin="8,0,0,0">
+                        <ui:Button Content="↑" Width="24" Height="24" Padding="0" ToolTip="上移" Tag="MoveUp" Click="ActionButton_Click"/>
+                        <ui:Button Content="↓" Width="24" Height="24" Padding="0" Margin="2,0,0,0" ToolTip="下移" Tag="MoveDown" Click="ActionButton_Click"/>
+                        <ui:Button Content="×" Width="24" Height="24" Padding="0" Margin="2,0,0,0" ToolTip="删除" Tag="Delete" Click="ActionButton_Click"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+            
+            <!-- 展开内容 -->
+            <Border x:Name="ContentPanel" Padding="12" Background="#252525" RenderTransformOrigin="0.5,0">
+                <Border.LayoutTransform>
+                    <ScaleTransform ScaleY="0"/>
+                </Border.LayoutTransform>
+                <StackPanel>
+                    <!-- 一键配置按钮 -->
+                    <ui:Button Content="⚡ 一键配置" Appearance="Primary" Height="36" HorizontalAlignment="Stretch" Margin="0,0,0,12" Tag="QuickConfig" Click="ActionButton_Click"/>
+                    
+                    <!-- 基础配置 -->
+                    <TextBlock Text="基础配置" FontWeight="SemiBold" Margin="0,0,0,8" Foreground="#CCC"/>
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Margin="0,0,8,0">
+                            <TextBlock Text="技能名称" FontSize="12" Foreground="#999" Margin="0,0,0,4"/>
+                            <ui:TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" TextChanged="OnConfigChanged"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                            <TextBlock Text="优先级" FontSize="12" Foreground="#999" Margin="0,0,0,4"/>
+                            <ui:TextBox Text="{Binding Priority}" TextChanged="OnConfigChanged"/>
+                        </StackPanel>
+                    </Grid>
+                    
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Margin="0,0,8,0">
+                            <TextBlock Text="冷却时间(秒)" FontSize="12" Foreground="#999" Margin="0,0,0,4"/>
+                            <ui:TextBox Text="{Binding Cooldown}" TextChanged="OnConfigChanged"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                            <TextBlock Text="按键绑定" FontSize="12" Foreground="#999" Margin="0,0,0,4"/>
+                            <StackPanel Orientation="Horizontal">
+                                <Border Background="#333" CornerRadius="4" Padding="12,6" MinWidth="50">
+                                    <TextBlock Text="{Binding KeyCode, Converter={StaticResource KeyToName}}" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                </Border>
+                                <ui:Button Content="设置" Height="32" Margin="8,0,0,0" Tag="CaptureKey" Click="ActionButton_Click"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Grid>
+                    
+                    <!-- 视觉检测 -->
+                    <TextBlock Text="视觉检测" FontWeight="SemiBold" Margin="0,8,0,8" Foreground="#CCC"/>
+                    
+                    <TextBlock Text="检测区域" FontSize="12" Foreground="#999" Margin="0,0,0,4"/>
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <UniformGrid Columns="4">
+                            <ui:TextBox Text="{Binding IconRegion[0], Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="X" Margin="0,0,4,0" TextChanged="OnConfigChanged"/>
+                            <ui:TextBox Text="{Binding IconRegion[1], Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Y" Margin="2,0" TextChanged="OnConfigChanged"/>
+                            <ui:TextBox Text="{Binding IconRegion[2], Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="宽" Margin="2,0" TextChanged="OnConfigChanged"/>
+                            <ui:TextBox Text="{Binding IconRegion[3], Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="高" Margin="4,0,0,0" TextChanged="OnConfigChanged"/>
+                        </UniformGrid>
+                        <ui:Button Grid.Column="1" Content="框选" Height="32" Margin="8,0,0,0" Tag="SelectRegion" Click="ActionButton_Click"/>
+                    </Grid>
+                    
+                    <TextBlock Text="模板路径" FontSize="12" Foreground="#999" Margin="0,0,0,4"/>
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <ui:TextBox x:Name="TemplatePathBox" Text="{Binding TemplatePath}" IsReadOnly="True"/>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="8,0,0,0">
+                            <ui:Button Content="截取" Height="32" Tag="CaptureTemplate" Click="ActionButton_Click"/>
+                            <ui:Button Content="测试" Height="32" Margin="4,0,0,0" Appearance="Info" Tag="TestMatch" Click="ActionButton_Click"/>
+                        </StackPanel>
+                    </Grid>
+                    
+                    <!-- 模板预览 -->
+                    <Border x:Name="TemplatePreviewBorder" Background="#1a1a1a" CornerRadius="4" Padding="8" Margin="0,0,0,12" Visibility="Collapsed">
+                        <StackPanel Orientation="Horizontal">
+                            <Image x:Name="TemplatePreviewImage" Width="48" Height="48" Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor"/>
+                            <StackPanel Margin="12,0,0,0" VerticalAlignment="Center">
+                                <TextBlock x:Name="TemplateInfoText" Text="模板: 未配置" FontSize="12" Foreground="#CCC"/>
+                                <TextBlock x:Name="RegionInfoText" Text="区域: 未配置" FontSize="11" Foreground="#888" Margin="0,2,0,0"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                    
+                    <!-- 释放条件 -->
+                    <TextBlock Text="释放条件 (可选)" FontWeight="SemiBold" Margin="0,8,0,8" Foreground="#CCC"/>
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Margin="0,0,8,0">
+                            <TextBlock Text="最低HP%" FontSize="12" Foreground="#999" Margin="0,0,0,4"/>
+                            <ui:TextBox Text="{Binding MinHp}" TextChanged="OnConfigChanged"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                            <TextBlock Text="最低MP%" FontSize="12" Foreground="#999" Margin="0,0,0,4"/>
+                            <ui:TextBox Text="{Binding MinMp}" TextChanged="OnConfigChanged"/>
+                        </StackPanel>
+                    </Grid>
+                    
+                    <!-- 连招配置 -->
+                    <TextBlock Text="连招配置 (可选)" FontWeight="SemiBold" Margin="0,8,0,8" Foreground="#CCC"/>
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Margin="0,0,8,0">
+                            <TextBlock Text="触发条件Buff" FontSize="12" Foreground="#999" Margin="0,0,0,4"/>
+                            <ComboBox x:Name="BuffComboBox" 
+                                      Text="{Binding PreCastConditionBuff, Mode=TwoWay}" 
+                                      IsEditable="True"
+                                      SelectionChanged="BuffComboBox_SelectionChanged"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                            <TextBlock Text="前置技能按键" FontSize="12" Foreground="#999" Margin="0,0,0,4"/>
+                            <StackPanel Orientation="Horizontal">
+                                <Border Background="#333" CornerRadius="4" Padding="12,6" MinWidth="50">
+                                    <TextBlock Text="{Binding PreCastKeyCode, Converter={StaticResource KeyToName}}" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                </Border>
+                                <ui:Button Content="设置" Height="32" Margin="8,0,0,0" Tag="CapturePreCastKey" Click="ActionButton_Click"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Grid>
+                    
+                    <StackPanel Margin="0,0,0,8">
+                        <TextBlock Text="连招延迟(毫秒)" FontSize="12" Foreground="#999" Margin="0,0,0,4"/>
+                        <ui:TextBox Text="{Binding ComboDelay}" Width="150" HorizontalAlignment="Left" TextChanged="OnConfigChanged"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </Border>
+</UserControl>

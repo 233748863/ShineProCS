@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Collections.Concurrent;
 using System.IO;
 using ShineProCS.Core.Interfaces;
@@ -50,67 +49,30 @@ public class SkillLoopEngine
     
     #region 图像处理
     
-    /// <summary>
-    /// 生产者-消费者模型的图像队列
-    /// </summary>
     private BlockingCollection<Mat> _imageQueue = null!;
     private int _unchangedFrameCount;
-    
-    // 帧差分优化：使用像素采样代替pHash
     private int _lastSampleSum;
-    private const int SampleStride = 16; // 采样步长
-    
-    #endregion
-    
-    #region 气劲状态
-    
-    /// <summary>
-    /// 状态锁，保护共享状态的线程安全
-    /// </summary>
-    private readonly object _stateLock = new();
-    private bool _isQianZhiActive;
-    private bool _qiQingInLoop;
+    private const int SampleStride = 16;
     
     #endregion
 
     #region 事件
     
-    /// <summary>
-    /// 引擎状态变化事件
-    /// </summary>
     public event Action<EngineStatus>? StatusChanged;
-    
-    /// <summary>
-    /// 日志消息事件
-    /// </summary>
     public event Action<string, int>? LogMessage;
     
     #endregion
 
-    #region 气劲配置属性
-    
-    private string QianZhiSkillName => _config.AppSettings.QianZhiSkillName;
-    private string QianZhiBuffName => _config.AppSettings.QianZhiBuffName;
-    private int QianZhiKeyCode => _config.AppSettings.QianZhiKeyCode;
-    private string ChiShaoSkillName => _config.AppSettings.ChiShaoSkillName;
-    private string QiQingSkillName => _config.AppSettings.QiQingSkillName;
-    private string QiQingBuffName => _config.AppSettings.QiQingBuffName;
-    
-    #endregion
+    private string? _nextSkillName;
+    private double _lastHpPercent = 100;
+    private double _lastMpPercent = 100;
 
-    /// <summary>
-    /// 创建技能循环引擎实例
-    /// </summary>
-    /// <param name="keyboard">键盘接口</param>
-    /// <param name="image">图像接口</param>
-    /// <param name="config">配置管理器</param>
     public SkillLoopEngine(IKeyboardInterface keyboard, IImageInterface image, ConfigManager config)
     {
         _keyboard = keyboard;
         _image = image;
         _config = config;
         
-        // 初始化模板预加载器
         _templatePreloader = new TemplatePreloader();
         var preloadCount = _templatePreloader.PreloadFromConfig(config);
         if (preloadCount > 0)
@@ -118,7 +80,6 @@ public class SkillLoopEngine
         
         _stateDetector = new StateDetector(image, config, _templatePreloader);
         
-        // 使用策略加载器加载所有策略（内置 + 插件）
         _strategyLoader = new StrategyLoader();
         _strategies = _strategyLoader.LoadAllStrategies();
         Log($"已加载 {_strategies.Count} 个策略: {string.Join(", ", _strategies.Select(s => s.Name))}", 1);
@@ -133,9 +94,6 @@ public class SkillLoopEngine
         LoadSkills();
     }
 
-    /// <summary>
-    /// 初始化图像队列（支持动态容量配置）
-    /// </summary>
     private void InitializeImageQueue()
     {
         var capacity = Math.Max(2, Math.Min(10, _config.AppSettings.ImageQueueCapacity));
@@ -153,7 +111,6 @@ public class SkillLoopEngine
                 LoadSkills();
                 _adaptiveDelay.Reset(_config.AppSettings.LoopInterval);
                 
-                // Toast 通知
                 var fileName = filePath.Contains("skills.json") ? "技能配置" : "应用设置";
                 Views.ToastManager.Success($"{fileName}已自动重载", "配置更新");
             }
@@ -189,7 +146,7 @@ public class SkillLoopEngine
         _unchangedFrameCount = 0;
         _captureTask = Task.Run(() => CaptureLoop(_cts.Token));
         _loopTask = Task.Run(() => MainLoop(_cts.Token));
-        Log("引擎已启动（高级模式：异步截屏 + 自适应延迟）", 1);
+        Log("引擎已启动", 1);
         NotifyStatus();
     }
 
@@ -214,26 +171,17 @@ public class SkillLoopEngine
         NotifyStatus();
     }
 
-    // 新增：记录下一个技能和游戏状态
-    private string? _nextSkillName;
-    private double _lastHpPercent = 100;
-    private double _lastMpPercent = 100;
-
     public EngineStatus GetStatus()
     {
         var m = _perfMonitor.GetMetrics();
-        bool isQianZhiActive, qiQingInLoop;
-        lock (_stateLock)
-        {
-            isQianZhiActive = _isQianZhiActive;
-            qiQingInLoop = _qiQingInLoop;
-        }
         return new EngineStatus
         {
-            IsRunning = _isRunning, IsPaused = _isPaused,
+            IsRunning = _isRunning, 
+            IsPaused = _isPaused,
             Mode = _isRunning ? (_isPaused ? "已暂停" : "运行中") : "已停止",
-            ExecutionCount = m.TotalExecutions, AvgResponseTime = m.AverageResponseTime, SuccessRate = m.SuccessRate,
-            IsQianZhiActive = isQianZhiActive, IsQiQingInLoop = qiQingInLoop,
+            ExecutionCount = m.TotalExecutions, 
+            AvgResponseTime = m.AverageResponseTime, 
+            SuccessRate = m.SuccessRate,
             NextSkillName = _nextSkillName,
             HpPercent = _lastHpPercent,
             MpPercent = _lastMpPercent
@@ -259,7 +207,6 @@ public class SkillLoopEngine
             catch (OperationCanceledException) { break; }
             catch (Exception ex)
             {
-                // 确保异常时也释放资源
                 if (mat != null) _image.ReturnMat(mat);
                 Log($"截屏异常: {ex.Message}", 2);
                 Thread.Sleep(100);
@@ -290,7 +237,6 @@ public class SkillLoopEngine
                 var gameState = _stateDetector.DetectGameState();
                 if (gameState.IsCasting) { Log("检测到读条中，等待...", 0); Thread.Sleep(50); continue; }
                 
-                // 使用并行模板匹配更新技能状态
                 _stateDetector.UpdateSkillStatesParallel(_skillStates);
                 
                 var success = ExecuteSkillCycle(gameState);
@@ -299,7 +245,6 @@ public class SkillLoopEngine
                 if (loopCount % 10 == 0) _adaptiveDelay.IsCombatMode = _stateDetector.DetectCombatState();
                 if (loopCount % 50 == 0 && _memMonitor.AutoCleanupIfNeeded(150)) Log("内存清理完成", 0);
                 
-                // 每100次循环更新窗口位置（以防窗口移动）
                 if (loopCount % 100 == 0 && _image is Infrastructure.OpenCvImageInterface ocv)
                     ocv.UpdateWindowPosition();
                 
@@ -317,21 +262,15 @@ public class SkillLoopEngine
             }
             finally
             {
-                // 确保在所有情况下都释放 Mat 资源
                 if (currentFrame != null) _image.ReturnMat(currentFrame);
             }
         }
     }
 
-    /// <summary>
-    /// 快速帧差分检测（像素采样法）
-    /// 比pHash更快，适合高频检测场景
-    /// </summary>
     private bool IsFrameUnchanged(Mat frame)
     {
         try
         {
-            // 像素采样法：每隔SampleStride个像素采样一次，计算总和
             int sum = 0;
             int width = frame.Width;
             int height = frame.Height;
@@ -342,26 +281,22 @@ public class SkillLoopEngine
                 var ptr = (byte*)frame.DataPointer;
                 int stride = (int)frame.Step();
                 
-                // 采样计算
                 for (int y = 0; y < height; y += SampleStride)
                 {
                     var row = ptr + y * stride;
                     for (int x = 0; x < width; x += SampleStride)
                     {
                         int offset = x * channels;
-                        // 简单灰度：(R+G+B)/3 的近似
                         sum += row[offset] + row[offset + 1] + row[offset + 2];
                     }
                 }
             }
             
-            // 比较差异
             int diff = Math.Abs(sum - _lastSampleSum);
             _lastSampleSum = sum;
             
-            // 差异阈值：根据采样点数量动态计算
             int sampleCount = (width / SampleStride) * (height / SampleStride);
-            int threshold = sampleCount * 15; // 平均每个采样点允许15的差异
+            int threshold = sampleCount * 15;
             
             return diff < threshold;
         }
@@ -373,127 +308,71 @@ public class SkillLoopEngine
 
     private bool ExecuteSkillCycle(GameState gameState)
     {
-        UpdateQianZhiState(gameState);
-        
-        bool isQianZhiActive, qiQingInLoop;
-        lock (_stateLock)
-        {
-            isQianZhiActive = _isQianZhiActive;
-            qiQingInLoop = _qiQingInLoop;
-        }
-        
-        if (isQianZhiActive) return HandleQianZhiActiveState(gameState);
-        if (qiQingInLoop) { var r = TryExecuteQiQingCombo(gameState); if (r.HasValue) return r.Value; }
-        return ExecuteNormalSkillCycle(gameState);
-    }
-
-    private void UpdateQianZhiState(GameState gameState)
-    {
-        var qianZhiBuff = FindBuffByName(QianZhiBuffName);
-        if (qianZhiBuff != null)
-        {
-            var isActive = _stateDetector.CheckBuffExists(qianZhiBuff);
-            lock (_stateLock)
-            {
-                var wasActive = _isQianZhiActive;
-                _isQianZhiActive = isActive;
-                if (_isQianZhiActive != wasActive) Log(_isQianZhiActive ? "千枝气劲已开启" : "千枝气劲已关闭", 0);
-            }
-        }
-    }
-
-    private bool HandleQianZhiActiveState(GameState gameState)
-    {
-        bool qiQingInLoop;
-        lock (_stateLock) { qiQingInLoop = _qiQingInLoop; }
-        
-        if (qiQingInLoop)
-        {
-            var qiQingSkill = FindSkillByName(QiQingSkillName);
-            if (qiQingSkill != null && !IsQiQingBuffActive(gameState))
-            {
-                if (qiQingSkill.IsAvailable && qiQingSkill.IsVisuallyReady) return ExecuteSkill(qiQingSkill);
-                lock (_stateLock) { _qiQingInLoop = false; }
-                Log($"{QiQingSkillName}CD中，已退出循环", 0);
-            }
-            else if (IsQiQingBuffActive(gameState))
-            {
-                lock (_stateLock) { _qiQingInLoop = false; }
-                Log("七情被动已激活，已退出循环", 0);
-            }
-        }
-        var chiShaoSkill = FindSkillByName(ChiShaoSkillName);
-        if (chiShaoSkill != null && chiShaoSkill.IsAvailable && chiShaoSkill.IsVisuallyReady) return ExecuteSkill(chiShaoSkill);
-        Log($"{ChiShaoSkillName}CD中，关闭千枝气劲", 0);
-        if (_keyboard.PressAndRelease(QianZhiKeyCode))
-        {
-            lock (_stateLock) { _isQianZhiActive = false; }
-            return true;
-        }
-        return false;
-    }
-
-    private bool? TryExecuteQiQingCombo(GameState gameState)
-    {
-        var qiQingSkill = FindSkillByName(QiQingSkillName);
-        if (qiQingSkill == null) return null;
-        if (IsQiQingBuffActive(gameState))
-        {
-            lock (_stateLock) { _qiQingInLoop = false; }
-            Log("七情被动已激活，已退出循环", 0);
-            return null;
-        }
-        if (qiQingSkill.IsAvailable && qiQingSkill.IsVisuallyReady)
-        {
-            if (gameState.MpPercentage >= 0.3)
-            {
-                Log("蓝量充足，先开千枝再放七情", 0);
-                if (_keyboard.PressAndRelease(QianZhiKeyCode))
-                {
-                    Thread.Sleep(100);
-                    lock (_stateLock) { _isQianZhiActive = true; }
-                }
-            }
-            return ExecuteSkill(qiQingSkill);
-        }
-        lock (_stateLock) { _qiQingInLoop = false; }
-        Log($"{QiQingSkillName}CD中，已退出循环", 0);
-        return null;
-    }
-
-    private bool ExecuteNormalSkillCycle(GameState gameState)
-    {
-        // 更新HP/MP状态
         _lastHpPercent = gameState.HpPercentage * 100;
         _lastMpPercent = gameState.MpPercentage * 100;
         
-        var context = new StrategyContext { SkillStates = _skillStates, GameState = gameState, LoopMode = _config.AppSettings.EnableSmartMode ? "Smart" : "Default" };
-        SkillRuntimeState? skill = null;
-        foreach (var s in _strategies) if (s.CanExecute(context) && (skill = s.SelectSkill(context)) != null) break;
+        var context = new StrategyContext 
+        { 
+            SkillStates = _skillStates, 
+            GameState = gameState, 
+            LoopMode = _config.AppSettings.EnableSmartMode ? "Smart" : "Default" 
+        };
         
-        // 更新下一个技能名称
+        SkillRuntimeState? skill = null;
+        foreach (var s in _strategies) 
+            if (s.CanExecute(context) && (skill = s.SelectSkill(context)) != null) 
+                break;
+        
         _nextSkillName = skill?.Config.Name;
         
         if (skill == null) return true;
 
-        var buffSatisfied = _stateDetector.CheckBuffRequirements(skill.Config, gameState);
+        // 检查Buff条件
+        var buffSatisfied = CheckBuffCondition(skill.Config);
+        
         if (!buffSatisfied && skill.Config.PreCastKeyCode > 0)
         {
             Log($"联动触发: {skill.Config.Name} 缺少Buff [{skill.Config.PreCastConditionBuff}]，释放前置技能", 0);
-            if (!_keyboard.PressAndRelease(skill.Config.PreCastKeyCode)) { Log("前置技能释放失败", 2); return false; }
-            Thread.Sleep(skill.Config.ComboDelay);
-            if (skill.Config.PreCastKeyCode == QianZhiKeyCode)
-            {
-                lock (_stateLock) { _isQianZhiActive = true; }
+            if (!_keyboard.PressAndRelease(skill.Config.PreCastKeyCode)) 
+            { 
+                Log("前置技能释放失败", 2); 
+                return false; 
             }
+            Thread.Sleep(skill.Config.ComboDelay);
+            
             var newState = _stateDetector.DetectGameState();
-            if (newState.IsCasting) { Log("前置技能读条中，等待完成...", 0); return true; }
-            buffSatisfied = _stateDetector.CheckBuffRequirements(skill.Config, newState);
-            if (!buffSatisfied) { Log($"Buff [{skill.Config.PreCastConditionBuff}] 未获得，等待下次循环", 1); return true; }
+            if (newState.IsCasting) 
+            { 
+                Log("前置技能读条中，等待完成...", 0); 
+                return true; 
+            }
+            
+            buffSatisfied = CheckBuffCondition(skill.Config);
+            if (!buffSatisfied) 
+            { 
+                Log($"Buff [{skill.Config.PreCastConditionBuff}] 未获得，等待下次循环", 1); 
+                return true; 
+            }
             Log($"Buff [{skill.Config.PreCastConditionBuff}] 已获得", 0);
         }
-        else if (!buffSatisfied && skill.Config.PreCastKeyCode <= 0) { Log($"技能 {skill.Config.Name} Buff条件不满足，跳过", 0); return true; }
+        else if (!buffSatisfied && skill.Config.PreCastKeyCode <= 0) 
+        { 
+            Log($"技能 {skill.Config.Name} Buff条件不满足，跳过", 0); 
+            return true; 
+        }
+        
         return ExecuteSkill(skill);
+    }
+
+    /// <summary>
+    /// 检查技能的Buff条件是否满足（从Buff库检查）
+    /// </summary>
+    private bool CheckBuffCondition(SkillConfig skill)
+    {
+        if (string.IsNullOrEmpty(skill.PreCastConditionBuff))
+            return true;
+        
+        return _stateDetector.CheckBuffExists(skill.PreCastConditionBuff);
     }
 
     private bool ExecuteSkill(SkillRuntimeState skill)
@@ -510,10 +389,7 @@ public class SkillLoopEngine
         {
             skill.MarkAsUsed();
             skill.ConsecutiveFailures = 0;
-            
-            // 记录技能使用，用于CD追踪
             _cooldownTracker.RecordSkillUse(skill.Config.Name, skill.Config.Cooldown);
-            
             Log($"释放: {skill.Config.Name}", 0);
             return true;
         }
@@ -522,24 +398,15 @@ public class SkillLoopEngine
         return false;
     }
 
-    /// <summary>
-    /// 获取技能CD追踪器
-    /// </summary>
     public SkillCooldownTracker CooldownTracker => _cooldownTracker;
-
-    /// <summary>
-    /// 获取技能统计信息
-    /// </summary>
     public SkillStatistics GetSkillStatistics(string skillName) => _cooldownTracker.GetStatistics(skillName);
-
-    private bool IsQiQingBuffActive(GameState gameState) { var b = FindBuffByName(QiQingBuffName); return b != null && _stateDetector.CheckBuffExists(b); }
-    private SkillRuntimeState? FindSkillByName(string name) => _skillStates.FirstOrDefault(s => s.Config.Name == name);
-    private BuffRequirement? FindBuffByName(string name) { foreach (var s in _skillStates) { var b = s.Config.BuffRequirements.FirstOrDefault(x => x.Name == name); if (b != null) return b; } return null; }
-    private void Log(string msg, int level) { if (level >= _config.AppSettings.LogLevel) LogMessage?.Invoke($"[{DateTime.Now:HH:mm:ss}] {msg}", level); }
+    
+    private void Log(string msg, int level) 
+    { 
+        if (level >= _config.AppSettings.LogLevel) 
+            LogMessage?.Invoke($"[{DateTime.Now:HH:mm:ss}] {msg}", level); 
+    }
+    
     private void NotifyStatus() => StatusChanged?.Invoke(GetStatus());
     public void ReloadConfig() => LoadSkills();
-    public void EnableQiQingLoop() { lock (_stateLock) { _qiQingInLoop = true; } Log($"{QiQingSkillName}已加入循环", 1); }
-    public void DisableQiQingLoop() { lock (_stateLock) { _qiQingInLoop = false; } Log($"{QiQingSkillName}已退出循环", 1); }
-    public bool IsQiQingInLoop { get { lock (_stateLock) { return _qiQingInLoop; } } }
-    public bool IsQianZhiActive { get { lock (_stateLock) { return _isQianZhiActive; } } }
 }

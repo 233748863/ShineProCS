@@ -29,21 +29,18 @@ public class StateDetector
         var state = new GameState { UpdateTime = DateTime.Now };
         var settings = _config.AppSettings;
         
-        // 检测HP百分比
         if (settings.HealthBarRegion.Any(v => v > 0))
         {
             state.CurrentHpPercent = DetectBarPercent(settings.HealthBarRegion, isHealth: true);
             state.HpPercentage = state.CurrentHpPercent / 100.0;
         }
         
-        // 检测MP百分比
         if (settings.ManaBarRegion.Any(v => v > 0))
         {
             state.CurrentMpPercent = DetectBarPercent(settings.ManaBarRegion, isHealth: false);
             state.MpPercentage = state.CurrentMpPercent / 100.0;
         }
         
-        // 检测公共CD（读条状态）
         if (settings.GlobalCdPoint.Any(v => v > 0))
         {
             state.IsGlobalCdActive = DetectGlobalCd(settings.GlobalCdPoint);
@@ -60,7 +57,6 @@ public class StateDetector
     {
         if (states.Count == 0) return;
         
-        // 少于3个技能时串行处理更高效
         if (states.Count < 3)
         {
             foreach (var state in states)
@@ -68,7 +64,6 @@ public class StateDetector
             return;
         }
 
-        // 收集需要检测的技能（有配置区域的）
         var toDetect = states.Where(s => 
             s.Config.Enabled && 
             s.Config.IconRegion.Any(v => v > 0)).ToList();
@@ -80,20 +75,15 @@ public class StateDetector
             return;
         }
 
-        // 并行检测
         Parallel.ForEach(toDetect, new ParallelOptions { MaxDegreeOfParallelism = 4 }, state =>
         {
             UpdateSkillState(state);
         });
 
-        // 未配置区域的默认可用
         foreach (var s in states.Where(s => !toDetect.Contains(s)))
             s.IsVisuallyReady = true;
     }
 
-    /// <summary>
-    /// 检测血条/蓝条百分比
-    /// </summary>
     private double DetectBarPercent(int[] region, bool isHealth)
     {
         if (region.Length < 4 || region[2] <= 0 || region[3] <= 0)
@@ -145,9 +135,6 @@ public class StateDetector
         }
     }
 
-    /// <summary>
-    /// 检测公共CD是否激活
-    /// </summary>
     private bool DetectGlobalCd(int[] point)
     {
         if (point.Length < 2) return false;
@@ -164,7 +151,6 @@ public class StateDetector
         if (brightness > settings.GlobalCdBrightnessThreshold)
             return true;
         
-        // 黄色进度条检测
         if (r > 150 && g > 150 && b < 100)
             return true;
         
@@ -193,16 +179,12 @@ public class StateDetector
         state.IsVisuallyReady = CheckSkillByBrightness(region);
     }
 
-    /// <summary>
-    /// 通过模板匹配检测技能是否可用
-    /// </summary>
     private bool CheckSkillByTemplate(SkillConfig skill)
     {
         var region = skill.IconRegion;
         if (region.Length < 4 || region[2] <= 0 || region[3] <= 0)
             return true;
         
-        // 直接截取技能图标区域（ROI优化）
         var frame = _image.GetScreenRegion(region[0], region[1], region[2], region[3]);
         if (frame == null) return true;
         
@@ -220,15 +202,11 @@ public class StateDetector
         }
     }
 
-    /// <summary>
-    /// 通过亮度检测技能是否可用
-    /// </summary>
     private bool CheckSkillByBrightness(int[] region)
     {
         if (region.Length < 4 || region[2] <= 0 || region[3] <= 0)
             return true;
         
-        // 直接截取技能图标区域（ROI优化）
         var frame = _image.GetScreenRegion(region[0], region[1], region[2], region[3]);
         if (frame == null) return true;
         
@@ -247,47 +225,30 @@ public class StateDetector
     }
 
     /// <summary>
-    /// 检查Buff依赖要求
+    /// 从Buff库检查Buff是否存在
     /// </summary>
-    public bool CheckBuffRequirements(SkillConfig skill, GameState state)
+    public bool CheckBuffExists(string buffName)
     {
-        if (skill.BuffRequirements.Count == 0)
+        if (string.IsNullOrEmpty(buffName))
             return true;
         
-        foreach (var buff in skill.BuffRequirements)
-        {
-            var buffExists = CheckBuffExists(buff);
-            
-            if (buff.IsRequired && !buffExists)
-                return false;
-            
-            if (!buff.IsRequired && buffExists)
-                return false;
-        }
+        var buffConfig = _config.AppSettings.BuffLibrary
+            .FirstOrDefault(b => b.Name == buffName && b.Enabled);
         
-        return true;
-    }
-
-    /// <summary>
-    /// 检查Buff是否存在
-    /// </summary>
-    public bool CheckBuffExists(BuffRequirement buff)
-    {
-        var region = buff.IconRegion;
+        if (buffConfig == null)
+            return true; // 未配置的Buff默认视为存在
         
+        var region = buffConfig.IconRegion;
         if (region.All(v => v == 0))
             return true;
         
-        if (!string.IsNullOrEmpty(buff.TemplatePath) && File.Exists(buff.TemplatePath))
-            return CheckBuffByTemplate(buff);
+        if (!string.IsNullOrEmpty(buffConfig.TemplatePath) && File.Exists(buffConfig.TemplatePath))
+            return CheckBuffByTemplate(buffConfig);
         
         return CheckBuffByBrightness(region);
     }
-
-    /// <summary>
-    /// 通过模板匹配检测Buff
-    /// </summary>
-    private bool CheckBuffByTemplate(BuffRequirement buff)
+    
+    private bool CheckBuffByTemplate(BuffConfig buff)
     {
         var region = buff.IconRegion;
         if (region.Length < 4 || region[2] <= 0 || region[3] <= 0)
@@ -310,9 +271,6 @@ public class StateDetector
         }
     }
 
-    /// <summary>
-    /// 通过亮度检测Buff是否存在
-    /// </summary>
     private bool CheckBuffByBrightness(int[] region)
     {
         if (region.Length < 4 || region[2] <= 0 || region[3] <= 0)
@@ -335,14 +293,10 @@ public class StateDetector
         }
     }
 
-    /// <summary>
-    /// 获取模板图片（优先从预加载器获取，线程安全缓存）
-    /// </summary>
     private Mat? GetTemplate(string path)
     {
         if (string.IsNullOrEmpty(path)) return null;
         
-        // 优先从预加载器获取
         if (_preloader != null)
         {
             var preloaded = _preloader.GetTemplate(path);
@@ -359,7 +313,6 @@ public class StateDetector
             var template = Cv2.ImRead(path, ImreadModes.Color);
             if (!template.Empty())
             {
-                // 超过限制时清理旧缓存
                 if (_templateCache.Count >= MaxCacheSize)
                 {
                     var keysToRemove = _templateCache.Keys.Take(_templateCache.Count / 2).ToList();
@@ -380,9 +333,6 @@ public class StateDetector
         return null;
     }
 
-    /// <summary>
-    /// 清理模板缓存
-    /// </summary>
     public void ClearTemplateCache()
     {
         foreach (var kvp in _templateCache)
@@ -390,9 +340,6 @@ public class StateDetector
         _templateCache.Clear();
     }
 
-    /// <summary>
-    /// 检测是否处于战斗状态
-    /// </summary>
     public bool DetectCombatState()
     {
         try

@@ -1,6 +1,8 @@
 using System.Windows;
+using ShineProCS.Core.Services;
 using ShineProCS.Utils;
 using ShineProCS.ViewModels;
+using ShineProCS.Views;
 using Wpf.Ui.Controls;
 
 namespace ShineProCS;
@@ -15,6 +17,14 @@ public partial class MainWindow : FluentWindow
         InitializeTrayIcon();
         Loaded += OnLoaded;
         Closing += OnClosing;
+    }
+    
+    /// <summary>
+    /// 获取ConfigManager实例（供子页面使用）
+    /// </summary>
+    public ConfigManager? GetConfigManager()
+    {
+        return (DataContext as MainViewModel)?.ConfigManager;
     }
 
     private void InitializeTrayIcon()
@@ -51,10 +61,6 @@ public partial class MainWindow : FluentWindow
         pauseItem.Click += (s, e) => Dispatcher.Invoke(() => (DataContext as MainViewModel)?.PauseEngineCommand.Execute(null));
         menu.Items.Add(pauseItem);
         
-        var qiqingItem = new System.Windows.Forms.ToolStripMenuItem("七情模式");
-        qiqingItem.Click += (s, e) => Dispatcher.Invoke(() => (DataContext as MainViewModel)?.ToggleQiQingModeCommand.Execute(null));
-        menu.Items.Add(qiqingItem);
-        
         menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
         
         var exitItem = new System.Windows.Forms.ToolStripMenuItem("退出");
@@ -76,6 +82,12 @@ public partial class MainWindow : FluentWindow
         // 初始化全局快捷键（使用 ViewModel 中的服务）
         var vm = DataContext as MainViewModel;
         vm?.InitializeHotkeys(this);
+        
+        // 初始化技能配置页的图像接口
+        if (vm != null)
+        {
+            SkillConfigPageControl.SetImageInterface(vm.ImageInterface);
+        }
     }
 
     /// <summary>

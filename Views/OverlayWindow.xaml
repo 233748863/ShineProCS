@@ -52,16 +52,6 @@
                     <Border x:Name="MpBar" Background="#64B5F6" CornerRadius="2" HorizontalAlignment="Left" Width="0"/>
                 </Border>
             </Grid>
-            
-            <!-- 气劲状态显示 -->
-            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                <Border x:Name="QianZhiBorder" Background="#333" CornerRadius="3" Padding="6,2" Margin="0,0,8,0">
-                    <TextBlock x:Name="QianZhiText" Text="千枝" Foreground="#666" FontSize="10"/>
-                </Border>
-                <Border x:Name="QiQingBorder" Background="#333" CornerRadius="3" Padding="6,2">
-                    <TextBlock x:Name="QiQingText" Text="七情" Foreground="#666" FontSize="10"/>
-                </Border>
-            </StackPanel>
         </StackPanel>
     </Border>
     
@@ -70,8 +60,6 @@
         <ContextMenu>
             <MenuItem x:Name="MenuStartStop" Header="启动引擎" Click="MenuStartStop_Click"/>
             <MenuItem Header="暂停/恢复" Click="MenuPause_Click"/>
-            <Separator/>
-            <MenuItem Header="七情模式" Click="MenuQiQing_Click"/>
             <Separator/>
             <MenuItem x:Name="ProfileMenu" Header="切换方案"/>
             <Separator/>

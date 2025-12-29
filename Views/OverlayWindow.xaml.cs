@@ -40,11 +40,6 @@ public partial class OverlayWindow : Window
     public event Action? OnPauseRequested;
     
     /// <summary>
-    /// 请求切换七情模式
-    /// </summary>
-    public event Action? OnQiQingToggleRequested;
-    
-    /// <summary>
     /// 请求隐藏悬浮窗
     /// </summary>
     public event Action? OnHideRequested;
@@ -167,13 +162,10 @@ public partial class OverlayWindow : Window
     /// <param name="status">运行状态文本</param>
     /// <param name="count">执行次数</param>
     /// <param name="responseMs">响应时间（毫秒）</param>
-    /// <param name="isQianZhiActive">千枝气劲是否激活</param>
-    /// <param name="isQiQingInLoop">七情是否在循环中</param>
     /// <param name="nextSkill">下一个技能名称</param>
     /// <param name="hpPercent">HP百分比</param>
     /// <param name="mpPercent">MP百分比</param>
     public void UpdateStatus(string status, int count, double responseMs, 
-        bool isQianZhiActive = false, bool isQiQingInLoop = false, 
         string? nextSkill = null, double hpPercent = 100, double mpPercent = 100)
     {
         Dispatcher.Invoke(() =>
@@ -200,13 +192,6 @@ public partial class OverlayWindow : Window
             var barMaxWidth = 60.0;
             HpBar.Width = Math.Max(0, Math.Min(barMaxWidth, barMaxWidth * hpPercent / 100.0));
             MpBar.Width = Math.Max(0, Math.Min(barMaxWidth, barMaxWidth * mpPercent / 100.0));
-            
-            // 气劲状态
-            QianZhiBorder.Background = isQianZhiActive ? ActiveBgBrush : InactiveBgBrush;
-            QianZhiText.Foreground = isQianZhiActive ? WhiteBrush : DarkGrayBrush;
-            
-            QiQingBorder.Background = isQiQingInLoop ? OrangeBrush : InactiveBgBrush;
-            QiQingText.Foreground = isQiQingInLoop ? WhiteBrush : DarkGrayBrush;
         });
     }
 
@@ -231,11 +216,6 @@ public partial class OverlayWindow : Window
     private void MenuPause_Click(object sender, RoutedEventArgs e)
     {
         OnPauseRequested?.Invoke();
-    }
-
-    private void MenuQiQing_Click(object sender, RoutedEventArgs e)
-    {
-        OnQiQingToggleRequested?.Invoke();
     }
 
     private void MenuOpacity_Click(object sender, RoutedEventArgs e)
