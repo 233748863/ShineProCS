@@ -19,7 +19,7 @@
                 <DockPanel DockPanel.Dock="Top" Margin="0,0,0,12">
                     <TextBlock Text="Buff/Debuff 库" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center"/>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                        <ui:Button Content="+ 添加" Appearance="Primary" Height="32" Click="AddBuff_Click"/>
+                        <ui:Button x:Name="AddBuffButton" Content="+ 添加" Appearance="Primary" Height="32" Click="AddBuff_Click"/>
                     </StackPanel>
                 </DockPanel>
                 

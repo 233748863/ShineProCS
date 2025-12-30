@@ -388,6 +388,27 @@ public class ConfigManager
             File.WriteAllText(_appSettingsPath, JsonSerializer.Serialize(_appSettings, options));
         }
     }
+    
+    /// <summary>
+    /// 保存指定的AppSettings到文件
+    /// 用于外部组件修改AppSettings后保存
+    /// </summary>
+    public void SaveAppSettings(AppSettings settings)
+    {
+        lock (_configLock)
+        {
+            if (settings == null) return;
+            
+            // 更新内部引用
+            _appSettings = settings;
+            
+            // 保存前备份
+            BackupBeforeSave(_appSettingsPath);
+            
+            var options = new JsonSerializerOptions { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+            File.WriteAllText(_appSettingsPath, JsonSerializer.Serialize(_appSettings, options));
+        }
+    }
 
     public void SaveSkills()
     {

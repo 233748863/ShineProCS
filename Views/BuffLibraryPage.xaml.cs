@@ -15,6 +15,7 @@ public partial class BuffLibraryPage : WinUserControl
     private MainViewModel? _viewModel;
     private IImageInterface? _imageInterface;
     private BuffConfig? _selectedBuff;
+    private BuffConfig? _pendingNewBuff; // 待保存的新Buff
     
     public BuffLibraryPage()
     {
@@ -40,6 +41,14 @@ public partial class BuffLibraryPage : WinUserControl
     {
         if (_viewModel == null) return;
         
+        // 如果有待保存的新Buff，提示先保存
+        if (_pendingNewBuff != null)
+        {
+            ToastManager.Warning("请先保存当前新增的Buff", "提示");
+            BuffList.SelectedItem = _pendingNewBuff;
+            return;
+        }
+        
         var newBuff = new BuffConfig
         {
             Name = $"buff_{DateTime.Now:HHmmss}",
@@ -49,9 +58,15 @@ public partial class BuffLibraryPage : WinUserControl
         };
         
         _viewModel.AppSettings.BuffLibrary.Add(newBuff);
+        _pendingNewBuff = newBuff;
+        
+        // 禁用添加按钮
+        AddBuffButton.IsEnabled = false;
+        
+        BuffList.Items.Refresh();
         BuffList.SelectedItem = newBuff;
         
-        ToastManager.Info("已添加新Buff，请编辑后点击保存", "Buff库");
+        ToastManager.Info("请编辑后点击保存", "已添加");
     }
     
     private void BuffList_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
@@ -127,6 +142,13 @@ public partial class BuffLibraryPage : WinUserControl
             
             if (result == MessageBoxResult.Yes)
             {
+                // 如果删除的是待保存的新Buff，清除待保存状态
+                if (buff == _pendingNewBuff)
+                {
+                    _pendingNewBuff = null;
+                    AddBuffButton.IsEnabled = true;
+                }
+                
                 _viewModel.AppSettings.BuffLibrary.Remove(buff);
                 
                 if (_selectedBuff == buff)
@@ -136,10 +158,11 @@ public partial class BuffLibraryPage : WinUserControl
                     EmptyHint.Visibility = Visibility.Visible;
                 }
                 
-                // 保存配置到文件
-                _viewModel.ConfigManager.SaveAll();
+                // 立即保存到文件
+                _viewModel.ConfigManager.SaveAppSettings(_viewModel.AppSettings);
                 
-                ToastManager.Success($"已删除 {buff.DisplayName}", "Buff库");
+                BuffList.Items.Refresh();
+                ToastManager.Success($"已删除 {buff.DisplayName}", "删除成功");
             }
         }
     }
@@ -291,9 +314,17 @@ public partial class BuffLibraryPage : WinUserControl
         if (double.TryParse(ThresholdBox.Text, out double threshold))
             _selectedBuff.SimilarityThreshold = Math.Clamp(threshold, 0.0, 1.0);
         
-        // 保存配置
-        _viewModel.ConfigManager.SaveAll();
+        // 保存到文件
+        _viewModel.ConfigManager.SaveAppSettings(_viewModel.AppSettings);
         
-        ToastManager.Success($"已保存 {_selectedBuff.DisplayName}", "Buff库");
+        // 如果保存的是待保存的新Buff，清除待保存状态，启用添加按钮
+        if (_selectedBuff == _pendingNewBuff)
+        {
+            _pendingNewBuff = null;
+            AddBuffButton.IsEnabled = true;
+        }
+        
+        BuffList.Items.Refresh();
+        ToastManager.Success($"已保存 {_selectedBuff.DisplayName}", "保存成功");
     }
 }
