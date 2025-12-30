@@ -677,6 +677,78 @@ public partial class MainViewModel : ObservableObject, IDisposable
     }
     
     /// <summary>
+    /// 取公共CD颜色
+    /// </summary>
+    [RelayCommand]
+    private void PickGlobalCdColor()
+    {
+        var point = AppSettings.GlobalCdPoint;
+        if (point.All(v => v == 0))
+        {
+            ToastManager.Warning("请先设置公共CD检测点", "取色失败");
+            return;
+        }
+        
+        var color = _imageInterface.GetPixelColor(point[0], point[1]);
+        if (color == null)
+        {
+            ToastManager.Error("无法获取颜色", "取色失败");
+            return;
+        }
+        
+        AppSettings.GlobalCdColor = [color.Value.r, color.Value.g, color.Value.b];
+        OnPropertyChanged(nameof(GlobalCdPreviewColor));
+        OnLog($"公共CD颜色: R={color.Value.r}, G={color.Value.g}, B={color.Value.b}", 1);
+        ToastManager.Success($"R={color.Value.r}, G={color.Value.g}, B={color.Value.b}", "取色成功");
+    }
+    
+    /// <summary>
+    /// 公共CD颜色预览
+    /// </summary>
+    public System.Windows.Media.Color GlobalCdPreviewColor
+    {
+        get
+        {
+            var c = AppSettings.GlobalCdColor;
+            if (c.Length >= 3)
+                return System.Windows.Media.Color.FromRgb((byte)c[0], (byte)c[1], (byte)c[2]);
+            return System.Windows.Media.Colors.White;
+        }
+    }
+    
+    /// <summary>
+    /// 测试公共CD检测
+    /// </summary>
+    [RelayCommand]
+    private void TestGlobalCd()
+    {
+        var point = AppSettings.GlobalCdPoint;
+        if (point.All(v => v == 0))
+        {
+            ToastManager.Warning("请先设置公共CD检测点", "测试失败");
+            return;
+        }
+        
+        var color = _imageInterface.GetPixelColor(point[0], point[1]);
+        if (color == null)
+        {
+            ToastManager.Error("无法获取颜色", "测试失败");
+            return;
+        }
+        
+        var targetColor = AppSettings.GlobalCdColor;
+        var tolerance = AppSettings.GlobalCdColorTolerance;
+        
+        var isInCd = Math.Abs(color.Value.r - targetColor[0]) <= tolerance &&
+                     Math.Abs(color.Value.g - targetColor[1]) <= tolerance &&
+                     Math.Abs(color.Value.b - targetColor[2]) <= tolerance;
+        
+        var status = isInCd ? "正在公共CD中" : "公共CD已结束";
+        OnLog($"公共CD测试: {status} (当前颜色: R={color.Value.r}, G={color.Value.g}, B={color.Value.b})", 1);
+        ToastManager.Info($"{status}\n当前: R={color.Value.r}, G={color.Value.g}, B={color.Value.b}\n目标: R={targetColor[0]}, G={targetColor[1]}, B={targetColor[2]}", "公共CD检测");
+    }
+    
+    /// <summary>
     /// 分析区域主色调，返回推荐的HSV范围
     /// </summary>
     private (int hueMin, int hueMax, int satMin, int valMin) AnalyzeBarColor(int[] region)

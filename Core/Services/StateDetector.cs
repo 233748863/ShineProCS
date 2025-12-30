@@ -152,8 +152,27 @@ public class StateDetector
         var r = color.Value.r;
         var g = color.Value.g;
         var b = color.Value.b;
-        var brightness = (r + g + b) / 3.0;
         
+        // 优先使用点色检测：检测点颜色匹配公共CD颜色时，表示正在CD中
+        if (settings.GlobalCdColor.Length >= 3 && settings.GlobalCdColor.Any(v => v > 0))
+        {
+            var targetR = settings.GlobalCdColor[0];
+            var targetG = settings.GlobalCdColor[1];
+            var targetB = settings.GlobalCdColor[2];
+            var tolerance = settings.GlobalCdColorTolerance;
+            
+            // 颜色匹配 = 正在公共CD中
+            if (Math.Abs(r - targetR) <= tolerance &&
+                Math.Abs(g - targetG) <= tolerance &&
+                Math.Abs(b - targetB) <= tolerance)
+            {
+                return true;
+            }
+            return false;
+        }
+        
+        // 兼容旧逻辑：亮度检测
+        var brightness = (r + g + b) / 3.0;
         if (brightness > settings.GlobalCdBrightnessThreshold)
             return true;
         

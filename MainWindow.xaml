@@ -323,6 +323,54 @@
                                 </StackPanel>
                             </ui:Card>
                             
+                            <!-- 公共CD检测 -->
+                            <ui:Card Margin="0,0,0,16">
+                                <StackPanel>
+                                    <TextBlock Text="公共CD检测" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,12"/>
+                                    <TextBlock Text="检测公共CD进度条起始端的颜色，匹配时表示正在CD中" Foreground="#888" FontSize="12" Margin="0,0,0,8"/>
+                                    <Grid Margin="0,0,0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel>
+                                            <TextBlock Text="检测点 (X, Y)" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                                            <UniformGrid Columns="2">
+                                                <ui:TextBox Text="{Binding AppSettings.GlobalCdPoint[0]}" PlaceholderText="X" Margin="0,0,4,0"/>
+                                                <ui:TextBox Text="{Binding AppSettings.GlobalCdPoint[1]}" PlaceholderText="Y" Margin="4,0,0,0"/>
+                                            </UniformGrid>
+                                        </StackPanel>
+                                        <ui:Button Grid.Column="1" Content="取点" Height="32" Margin="8,0,0,0" VerticalAlignment="Bottom" Command="{Binding SelectPointCommand}" CommandParameter="GlobalCd"/>
+                                    </Grid>
+                                    <Grid Margin="0,0,0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel>
+                                            <TextBlock Text="CD进行中的颜色 (R, G, B)" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                                            <UniformGrid Columns="3">
+                                                <ui:TextBox Text="{Binding AppSettings.GlobalCdColor[0]}" PlaceholderText="R" Margin="0,0,4,0"/>
+                                                <ui:TextBox Text="{Binding AppSettings.GlobalCdColor[1]}" PlaceholderText="G" Margin="2,0"/>
+                                                <ui:TextBox Text="{Binding AppSettings.GlobalCdColor[2]}" PlaceholderText="B" Margin="4,0,0,0"/>
+                                            </UniformGrid>
+                                        </StackPanel>
+                                        <Border Grid.Column="1" x:Name="GlobalCdColorPreview" Width="32" Height="32" CornerRadius="4" Margin="8,0,0,0" VerticalAlignment="Bottom">
+                                            <Border.Background>
+                                                <SolidColorBrush Color="{Binding GlobalCdPreviewColor}"/>
+                                            </Border.Background>
+                                        </Border>
+                                        <ui:Button Grid.Column="2" Content="取色" Height="32" Margin="4,0,0,0" VerticalAlignment="Bottom" Command="{Binding PickGlobalCdColorCommand}"/>
+                                    </Grid>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                        <TextBlock Text="颜色容差:" VerticalAlignment="Center"/>
+                                        <ui:TextBox Text="{Binding AppSettings.GlobalCdColorTolerance}" Width="60" Margin="8,0,0,0"/>
+                                        <ui:Button Content="测试" Height="32" Margin="16,0,0,0" Appearance="Info" Command="{Binding TestGlobalCdCommand}"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </ui:Card>
+                            
                             <!-- 全局快捷键设置 -->
                             <ui:Card Margin="0,0,0,16">
                                 <StackPanel>

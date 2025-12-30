@@ -36,6 +36,17 @@ public partial class AppSettings : ObservableObject
     /// </summary>
     [ObservableProperty] private int[] _globalCdPoint = [0, 0];
     
+    /// <summary>
+    /// 公共CD进行中的颜色 [R, G, B]
+    /// 当检测点颜色匹配此颜色时，表示正在公共CD中
+    /// </summary>
+    [ObservableProperty] private int[] _globalCdColor = [255, 255, 255];
+    
+    /// <summary>
+    /// 公共CD颜色容差
+    /// </summary>
+    [ObservableProperty] private int _globalCdColorTolerance = 30;
+    
     #endregion
     
     #region 引擎配置

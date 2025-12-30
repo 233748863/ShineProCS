@@ -227,6 +227,10 @@ public class ConfigManager
             settings.TargetHealthBarRegion = [0, 0, 100, 20];
         if (settings.GlobalCdPoint.Length != 2)
             settings.GlobalCdPoint = [0, 0];
+        if (settings.GlobalCdColor.Length != 3)
+            settings.GlobalCdColor = [255, 255, 255];
+        if (settings.GlobalCdColorTolerance < 0)
+            settings.GlobalCdColorTolerance = 30;
         
         // 确保BuffLibrary已初始化
         settings.BuffLibrary ??= [];
