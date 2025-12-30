@@ -1,6 +1,5 @@
 using System.IO;
 using System.Windows;
-using System.Windows.Input;
 using System.Windows.Media.Imaging;
 using ShineProCS.Core.Interfaces;
 using ShineProCS.Core.Services;
@@ -57,9 +56,9 @@ public partial class BuffLibraryPage : WinUserControl
         ToastManager.Info("已添加新Buff，请编辑后点击保存", "Buff库");
     }
     
-    private void BuffItem_Click(object sender, MouseButtonEventArgs e)
+    private void BuffList_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
     {
-        if (sender is FrameworkElement fe && fe.DataContext is BuffConfig buff)
+        if (BuffList.SelectedItem is BuffConfig buff)
         {
             SelectBuff(buff);
         }
