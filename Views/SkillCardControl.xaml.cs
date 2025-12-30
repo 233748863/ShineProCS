@@ -70,6 +70,7 @@ public partial class SkillCardControl : System.Windows.Controls.UserControl
     {
         UpdateConfigStatus();
         UpdateTemplatePreview();
+        UpdateCastTypeUI();
     }
 
     /// <summary>
@@ -204,6 +205,49 @@ public partial class SkillCardControl : System.Windows.Controls.UserControl
         {
             Skill.PreCastConditionBuff = selectedBuff;
             ConfigChanged?.Invoke();
+        }
+    }
+    
+    /// <summary>
+    /// 施法类型变更处理
+    /// </summary>
+    private void CastTypeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        UpdateCastTypeUI();
+        ConfigChanged?.Invoke();
+    }
+    
+    /// <summary>
+    /// 更新施法类型相关UI显示
+    /// </summary>
+    private void UpdateCastTypeUI()
+    {
+        if (Skill == null) return;
+        
+        var castType = (Models.SkillCastType)Skill.CastType;
+        
+        // 瞬发：隐藏所有额外配置
+        // 正读条：显示读条时间
+        // 引导：显示引导时间和打断时间
+        
+        switch (castType)
+        {
+            case Models.SkillCastType.Instant:
+                CastDurationPanel.Visibility = Visibility.Collapsed;
+                ChannelInterruptPanel.Visibility = Visibility.Collapsed;
+                break;
+                
+            case Models.SkillCastType.CastTime:
+                CastDurationPanel.Visibility = Visibility.Visible;
+                CastDurationLabel.Text = "读条时间(毫秒)";
+                ChannelInterruptPanel.Visibility = Visibility.Collapsed;
+                break;
+                
+            case Models.SkillCastType.Channeled:
+                CastDurationPanel.Visibility = Visibility.Visible;
+                CastDurationLabel.Text = "引导时间(毫秒)";
+                ChannelInterruptPanel.Visibility = Visibility.Visible;
+                break;
         }
     }
 }

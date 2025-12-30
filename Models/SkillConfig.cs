@@ -3,6 +3,27 @@ using CommunityToolkit.Mvvm.ComponentModel;
 namespace ShineProCS.Models;
 
 /// <summary>
+/// 技能施法类型
+/// </summary>
+public enum SkillCastType
+{
+    /// <summary>
+    /// 瞬发技能 - 按下即释放，无需等待
+    /// </summary>
+    Instant = 0,
+    
+    /// <summary>
+    /// 正读条技能 - 按下后开始读条，读条完成后释放
+    /// </summary>
+    CastTime = 1,
+    
+    /// <summary>
+    /// 引导技能（倒读条） - 按下后持续引导，可提前打断
+    /// </summary>
+    Channeled = 2
+}
+
+/// <summary>
 /// 技能配置模型
 /// 定义单个技能的所有可配置属性
 /// </summary>
@@ -64,6 +85,25 @@ public partial class SkillConfig : ObservableObject
     [ObservableProperty] private double _cooldown;
     
     /// <summary>
+    /// 技能施法类型
+    /// </summary>
+    [ObservableProperty] private SkillCastType _castType = SkillCastType.Instant;
+    
+    /// <summary>
+    /// 施法/引导时间（毫秒）
+    /// 正读条：读条完成所需时间
+    /// 引导：完整引导时间
+    /// </summary>
+    [ObservableProperty] private int _castDuration;
+    
+    /// <summary>
+    /// 引导打断时间（毫秒）
+    /// 仅对引导技能有效，表示引导多久后打断
+    /// 0 = 不打断，完整引导
+    /// </summary>
+    [ObservableProperty] private int _channelInterruptTime;
+    
+    /// <summary>
     /// 前置技能按键码（联动技能）
     /// 当Buff条件不满足时，先释放此按键对应的技能
     /// </summary>
@@ -99,4 +139,23 @@ public partial class SkillConfig : ObservableObject
     /// 检查是否有有效的联动配置
     /// </summary>
     public bool HasComboConfig => PreCastKeyCode > 0 || !string.IsNullOrEmpty(PreCastConditionBuff);
+    
+    /// <summary>
+    /// 检查是否有施法时间配置
+    /// </summary>
+    public bool HasCastConfig => CastType != SkillCastType.Instant;
+    
+    /// <summary>
+    /// 获取实际等待时间（毫秒）
+    /// </summary>
+    public int GetEffectiveWaitTime()
+    {
+        return CastType switch
+        {
+            SkillCastType.Instant => 0,
+            SkillCastType.CastTime => CastDuration,
+            SkillCastType.Channeled => ChannelInterruptTime > 0 ? ChannelInterruptTime : CastDuration,
+            _ => 0
+        };
+    }
 }

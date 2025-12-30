@@ -274,6 +274,20 @@ public class ConfigManager
         
         if (skill.PreCastKeyCode < 0 || skill.PreCastKeyCode > 255)
             skill.PreCastKeyCode = 0;
+        
+        // 验证施法类型相关配置
+        if ((int)skill.CastType < 0 || (int)skill.CastType > 2)
+            skill.CastType = SkillCastType.Instant;
+        
+        if (skill.CastDuration < 0)
+            skill.CastDuration = 0;
+        else if (skill.CastDuration > 30000) // 最大30秒
+            skill.CastDuration = 30000;
+        
+        if (skill.ChannelInterruptTime < 0)
+            skill.ChannelInterruptTime = 0;
+        else if (skill.ChannelInterruptTime > skill.CastDuration && skill.CastDuration > 0)
+            skill.ChannelInterruptTime = skill.CastDuration;
     }
 
     /// <summary>

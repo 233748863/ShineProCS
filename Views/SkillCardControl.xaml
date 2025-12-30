@@ -6,6 +6,7 @@
     
     <UserControl.Resources>
         <utils:KeyCodeToNameConverter x:Key="KeyToName"/>
+        <utils:EnumToIntConverter x:Key="EnumToInt"/>
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
         
         <!-- 展开动画 -->
@@ -136,6 +137,47 @@
                                 </Border>
                                 <ui:Button Content="设置" Height="32" Margin="8,0,0,0" Tag="CaptureKey" Click="ActionButton_Click"/>
                             </StackPanel>
+                        </StackPanel>
+                    </Grid>
+                    
+                    <!-- 施法类型配置 -->
+                    <TextBlock Text="施法类型" FontWeight="SemiBold" Margin="0,8,0,8" Foreground="#CCC"/>
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        
+                        <StackPanel Margin="0,0,8,0">
+                            <TextBlock Text="技能类型" FontSize="12" Foreground="#999" Margin="0,0,0,4"/>
+                            <ComboBox x:Name="CastTypeComboBox" 
+                                      SelectedIndex="{Binding CastType, Mode=TwoWay, Converter={StaticResource EnumToInt}}"
+                                      SelectionChanged="CastTypeComboBox_SelectionChanged">
+                                <ComboBoxItem Content="⚡ 瞬发" ToolTip="按下即释放，无需等待"/>
+                                <ComboBoxItem Content="📖 正读条" ToolTip="按下后开始读条，读条完成后释放"/>
+                                <ComboBoxItem Content="🔄 引导" ToolTip="按下后持续引导，可提前打断"/>
+                            </ComboBox>
+                        </StackPanel>
+                        
+                        <StackPanel Grid.Column="1" Margin="8,0,0,0" x:Name="CastDurationPanel" Visibility="Collapsed">
+                            <TextBlock x:Name="CastDurationLabel" Text="读条时间(毫秒)" FontSize="12" Foreground="#999" Margin="0,0,0,4"/>
+                            <ui:TextBox Text="{Binding CastDuration}" TextChanged="OnConfigChanged"/>
+                        </StackPanel>
+                        
+                        <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Margin="0,8,0,0" x:Name="ChannelInterruptPanel" Visibility="Collapsed">
+                            <TextBlock Text="提前打断时间(毫秒)" FontSize="12" Foreground="#999" Margin="0,0,0,4"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <ui:TextBox Text="{Binding ChannelInterruptTime}" TextChanged="OnConfigChanged"/>
+                                <TextBlock Grid.Column="1" Text="0 = 完整引导" FontSize="11" Foreground="#666" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                            </Grid>
                         </StackPanel>
                     </Grid>
                     

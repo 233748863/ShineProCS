@@ -385,12 +385,115 @@ public class SkillLoopEngine
             return false;
         }
         
+        var config = skill.Config;
+        var castType = config.CastType;
+        
+        switch (castType)
+        {
+            case SkillCastType.Instant:
+                // 瞬发技能：直接按下释放
+                return ExecuteInstantSkill(skill);
+                
+            case SkillCastType.CastTime:
+                // 正读条技能：按下后等待读条完成
+                return ExecuteCastTimeSkill(skill);
+                
+            case SkillCastType.Channeled:
+                // 引导技能：按下后引导指定时间，可提前打断
+                return ExecuteChanneledSkill(skill);
+                
+            default:
+                return ExecuteInstantSkill(skill);
+        }
+    }
+    
+    /// <summary>
+    /// 执行瞬发技能
+    /// </summary>
+    private bool ExecuteInstantSkill(SkillRuntimeState skill)
+    {
         if (_keyboard.PressAndRelease(skill.Config.KeyCode))
         {
             skill.MarkAsUsed();
             skill.ConsecutiveFailures = 0;
             _cooldownTracker.RecordSkillUse(skill.Config.Name, skill.Config.Cooldown);
-            Log($"释放: {skill.Config.Name}", 0);
+            Log($"释放: {skill.Config.Name} [瞬发]", 0);
+            return true;
+        }
+        
+        skill.ConsecutiveFailures++;
+        return false;
+    }
+    
+    /// <summary>
+    /// 执行正读条技能
+    /// </summary>
+    private bool ExecuteCastTimeSkill(SkillRuntimeState skill)
+    {
+        var config = skill.Config;
+        
+        if (_keyboard.PressAndRelease(config.KeyCode))
+        {
+            skill.MarkAsUsed();
+            skill.ConsecutiveFailures = 0;
+            _cooldownTracker.RecordSkillUse(config.Name, config.Cooldown);
+            
+            var castTime = config.CastDuration;
+            if (castTime > 0)
+            {
+                Log($"释放: {config.Name} [读条 {castTime}ms]", 0);
+                // 等待读条完成
+                Thread.Sleep(castTime);
+            }
+            else
+            {
+                Log($"释放: {config.Name} [读条]", 0);
+            }
+            
+            return true;
+        }
+        
+        skill.ConsecutiveFailures++;
+        return false;
+    }
+    
+    /// <summary>
+    /// 执行引导技能
+    /// </summary>
+    private bool ExecuteChanneledSkill(SkillRuntimeState skill)
+    {
+        var config = skill.Config;
+        
+        // 引导技能需要按住，这里用 PressKey + Sleep + ReleaseKey 模拟
+        if (_keyboard.PressKey(config.KeyCode))
+        {
+            skill.MarkAsUsed();
+            skill.ConsecutiveFailures = 0;
+            _cooldownTracker.RecordSkillUse(config.Name, config.Cooldown);
+            
+            // 计算实际引导时间
+            var channelTime = config.ChannelInterruptTime > 0 
+                ? config.ChannelInterruptTime 
+                : config.CastDuration;
+            
+            if (channelTime > 0)
+            {
+                var interruptInfo = config.ChannelInterruptTime > 0 
+                    ? $"打断于 {config.ChannelInterruptTime}ms" 
+                    : "完整引导";
+                Log($"释放: {config.Name} [引导 {channelTime}ms, {interruptInfo}]", 0);
+                
+                // 引导指定时间
+                Thread.Sleep(channelTime);
+            }
+            else
+            {
+                Log($"释放: {config.Name} [引导]", 0);
+            }
+            
+            // 释放按键（打断引导或自然结束）
+            _keyboard.ReleaseKey(config.KeyCode);
+            
             return true;
         }
         
