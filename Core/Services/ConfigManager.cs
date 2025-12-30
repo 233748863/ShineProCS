@@ -223,6 +223,8 @@ public class ConfigManager
             settings.ManaBarRegion = [0, 0, 100, 20];
         if (settings.HealthBarRegion.Length != 4)
             settings.HealthBarRegion = [0, 0, 100, 20];
+        if (settings.TargetHealthBarRegion.Length != 4)
+            settings.TargetHealthBarRegion = [0, 0, 100, 20];
         if (settings.GlobalCdPoint.Length != 2)
             settings.GlobalCdPoint = [0, 0];
         
@@ -258,11 +260,14 @@ public class ConfigManager
         else if (skill.SimilarityThreshold > 1)
             skill.SimilarityThreshold = 1;
         
-        if (skill.MinHp < 0) skill.MinHp = 0;
-        else if (skill.MinHp > 100) skill.MinHp = 100;
-        
         if (skill.MinMp < 0) skill.MinMp = 0;
         else if (skill.MinMp > 100) skill.MinMp = 100;
+        
+        if (skill.HpCheckTarget < 0) skill.HpCheckTarget = 0;
+        else if (skill.HpCheckTarget > 2) skill.HpCheckTarget = 0;
+        
+        if (skill.HpThreshold < 0) skill.HpThreshold = 0;
+        else if (skill.HpThreshold > 100) skill.HpThreshold = 100;
         
         if (skill.IconRegion.Length != 4)
             skill.IconRegion = [0, 0, 0, 0];

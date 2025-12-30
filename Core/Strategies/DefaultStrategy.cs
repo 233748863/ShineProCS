@@ -31,13 +31,21 @@ public class DefaultStrategy : ISkillStrategy
             if (!skill.Config.Enabled || !skill.IsAvailable || !skill.IsVisuallyReady) 
                 continue;
             
-            // 检查HP要求
-            if (skill.Config.MinHp > 0 && context.GameState.HpPercentage * 100 < skill.Config.MinHp) 
-                continue;
-            
-            // 检查MP要求
+            // 检查自身MP要求（MP需高于指定值才能释放）
             if (skill.Config.MinMp > 0 && context.GameState.MpPercentage * 100 < skill.Config.MinMp) 
                 continue;
+            
+            // 检查HP条件
+            if (skill.Config.HpCheckTarget > 0 && skill.Config.HpThreshold > 0)
+            {
+                double hpToCheck = skill.Config.HpCheckTarget == 1 
+                    ? context.GameState.CurrentHpPercent  // 自身HP
+                    : context.GameState.TargetHpPercent;  // 目标HP
+                
+                // HP需低于阈值才释放
+                if (hpToCheck > skill.Config.HpThreshold)
+                    continue;
+            }
             
             // 注意：Buff检查和联动触发在Engine层处理，这里只做基础筛选
             return skill;
@@ -68,15 +76,22 @@ public class SmartStrategy : ISkillStrategy
     /// <inheritdoc/>
     public SkillRuntimeState? SelectSkill(StrategyContext context)
     {
-        var hpPercent = context.GameState.HpPercentage * 100;
         var mpPercent = context.GameState.MpPercentage * 100;
         
         // 智能策略：优先选择有联动配置的技能（联动技能通常优先级更高）
         // 1. 先筛选出所有可用技能
         var availableSkills = context.SkillStates
             .Where(s => s.Config.Enabled && s.IsVisuallyReady && s.IsAvailable)
-            .Where(s => s.Config.MinHp <= 0 || hpPercent >= s.Config.MinHp)
             .Where(s => s.Config.MinMp <= 0 || mpPercent >= s.Config.MinMp)
+            .Where(s => {
+                // HP条件检查
+                if (s.Config.HpCheckTarget <= 0 || s.Config.HpThreshold <= 0)
+                    return true;
+                double hpToCheck = s.Config.HpCheckTarget == 1 
+                    ? context.GameState.CurrentHpPercent 
+                    : context.GameState.TargetHpPercent;
+                return hpToCheck <= s.Config.HpThreshold;
+            })
             .ToList();
         
         if (!availableSkills.Any()) return null;

@@ -16,14 +16,20 @@ public partial class AppSettings : ObservableObject
     [ObservableProperty] private int[] _detectionRegion = [0, 0, 100, 100];
     
     /// <summary>
-    /// 蓝条检测区域 [X, Y, Width, Height]
+    /// 自身蓝条检测区域 [X, Y, Width, Height]
     /// </summary>
     [ObservableProperty] private int[] _manaBarRegion = [0, 0, 100, 20];
     
     /// <summary>
-    /// 血条检测区域 [X, Y, Width, Height]
+    /// 自身血条检测区域 [X, Y, Width, Height]
     /// </summary>
     [ObservableProperty] private int[] _healthBarRegion = [0, 0, 100, 20];
+    
+    /// <summary>
+    /// 目标血条检测区域 [X, Y, Width, Height]
+    /// 用于治疗/辅助技能检测目标HP
+    /// </summary>
+    [ObservableProperty] private int[] _targetHealthBarRegion = [0, 0, 100, 20];
     
     /// <summary>
     /// 公共CD检测点 [X, Y]

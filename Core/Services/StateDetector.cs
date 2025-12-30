@@ -41,6 +41,12 @@ public class StateDetector
             state.MpPercentage = state.CurrentMpPercent / 100.0;
         }
         
+        // 检测目标HP
+        if (settings.TargetHealthBarRegion.Any(v => v > 0))
+        {
+            state.TargetHpPercent = DetectBarPercent(settings.TargetHealthBarRegion, isHealth: true);
+        }
+        
         if (settings.GlobalCdPoint.Any(v => v > 0))
         {
             state.IsGlobalCdActive = DetectGlobalCd(settings.GlobalCdPoint);

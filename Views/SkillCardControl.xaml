@@ -326,19 +326,33 @@
                     </Border>
                     
                     <!-- 释放条件 -->
-                    <TextBlock Text="释放条件 (可选)" FontWeight="SemiBold" Margin="0,8,0,8" Foreground="#CCC"/>
+                    <TextBlock Text="释放条件 (可选, 0=不检测)" FontWeight="SemiBold" Margin="0,8,0,8" Foreground="#CCC"/>
                     <Grid Margin="0,0,0,8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <StackPanel Margin="0,0,8,0">
-                            <TextBlock Text="最低HP%" FontSize="12" Foreground="#999" Margin="0,0,0,4"/>
-                            <ui:TextBox Text="{Binding MinHp}" TextChanged="OnConfigChanged"/>
+                            <TextBlock Text="自身MP需高于%" FontSize="12" Foreground="#999" Margin="0,0,0,4"/>
+                            <ui:TextBox Text="{Binding MinMp}" TextChanged="OnConfigChanged" ToolTip="自身蓝量需高于此百分比才释放，0=不检测"/>
+                        </StackPanel>
+                    </Grid>
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Margin="0,0,8,0">
+                            <TextBlock Text="HP检测对象" FontSize="12" Foreground="#999" Margin="0,0,0,4"/>
+                            <ComboBox SelectedIndex="{Binding HpCheckTarget}" SelectionChanged="ComboBox_SelectionChanged">
+                                <ComboBoxItem Content="不检测"/>
+                                <ComboBoxItem Content="自身 (保命技能)"/>
+                                <ComboBoxItem Content="目标 (治疗技能)"/>
+                            </ComboBox>
                         </StackPanel>
                         <StackPanel Grid.Column="1" Margin="8,0,0,0">
-                            <TextBlock Text="最低MP%" FontSize="12" Foreground="#999" Margin="0,0,0,4"/>
-                            <ui:TextBox Text="{Binding MinMp}" TextChanged="OnConfigChanged"/>
+                            <TextBlock Text="HP需低于%" FontSize="12" Foreground="#999" Margin="0,0,0,4"/>
+                            <ui:TextBox Text="{Binding HpThreshold}" TextChanged="OnConfigChanged" ToolTip="当选定对象的HP低于此百分比时才释放"/>
                         </StackPanel>
                     </Grid>
                     

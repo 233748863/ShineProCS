@@ -65,14 +65,21 @@ public partial class SkillConfig : ObservableObject
     [ObservableProperty] private double _similarityThreshold = 0.8;
     
     /// <summary>
-    /// 释放此技能所需的最低HP百分比 (0-100)
-    /// </summary>
-    [ObservableProperty] private double _minHp;
-    
-    /// <summary>
-    /// 释放此技能所需的最低MP百分比 (0-100)
+    /// 自身MP需高于此值才释放 (0-100, 0=不检测)
+    /// 用于检查蓝量是否足够释放技能
     /// </summary>
     [ObservableProperty] private double _minMp;
+    
+    /// <summary>
+    /// HP检测对象 (0=不检测, 1=自身, 2=目标)
+    /// </summary>
+    [ObservableProperty] private int _hpCheckTarget;
+    
+    /// <summary>
+    /// HP需低于此值才释放 (0-100)
+    /// 配合HpCheckTarget使用：自身HP低于X%释放保命技能，或目标HP低于X%释放治疗技能
+    /// </summary>
+    [ObservableProperty] private double _hpThreshold;
     
     /// <summary>
     /// 是否需要有目标才能释放
@@ -186,7 +193,7 @@ public partial class SkillConfig : ObservableObject
     /// <summary>
     /// 检查是否有有效的释放条件配置
     /// </summary>
-    public bool HasReleaseCondition => MinHp > 0 || MinMp > 0;
+    public bool HasReleaseCondition => MinMp > 0 || (HpCheckTarget > 0 && HpThreshold > 0);
     
     /// <summary>
     /// 检查是否有有效的联动配置

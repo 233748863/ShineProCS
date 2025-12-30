@@ -271,10 +271,10 @@
                             <!-- HP/MP检测区域 -->
                             <ui:Card Margin="0,0,0,16">
                                 <StackPanel>
-                                    <TextBlock Text="HP/MP 检测区域" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,12"/>
+                                    <TextBlock Text="自身 HP/MP 检测区域" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,12"/>
                                     <Grid Margin="0,0,0,12"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                         <StackPanel>
-                                            <TextBlock Text="HP条区域 (X, Y, 宽, 高)" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                                            <TextBlock Text="自身HP条区域 (X, Y, 宽, 高)" FontWeight="SemiBold" Margin="0,0,0,4"/>
                                             <UniformGrid Columns="4">
                                                 <ui:TextBox Text="{Binding AppSettings.HealthBarRegion[0]}" PlaceholderText="X" Margin="0,0,4,0"/>
                                                 <ui:TextBox Text="{Binding AppSettings.HealthBarRegion[1]}" PlaceholderText="Y" Margin="2,0"/>
@@ -287,7 +287,7 @@
                                     </Grid>
                                     <Grid Margin="0,0,0,12"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                         <StackPanel>
-                                            <TextBlock Text="MP条区域 (X, Y, 宽, 高)" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                                            <TextBlock Text="自身MP条区域 (X, Y, 宽, 高)" FontWeight="SemiBold" Margin="0,0,0,4"/>
                                             <UniformGrid Columns="4">
                                                 <ui:TextBox Text="{Binding AppSettings.ManaBarRegion[0]}" PlaceholderText="X" Margin="0,0,4,0"/>
                                                 <ui:TextBox Text="{Binding AppSettings.ManaBarRegion[1]}" PlaceholderText="Y" Margin="2,0"/>
@@ -297,6 +297,27 @@
                                         </StackPanel>
                                         <ui:Button Grid.Column="1" Content="框选" Height="32" Margin="8,0,0,0" VerticalAlignment="Bottom" Command="{Binding SelectRegionCommand}" CommandParameter="ManaBar"/>
                                         <ui:Button Grid.Column="2" Content="测试" Height="32" Margin="4,0,0,0" VerticalAlignment="Bottom" Appearance="Info" Command="{Binding TestMpDetectionCommand}"/>
+                                    </Grid>
+                                </StackPanel>
+                            </ui:Card>
+                            
+                            <!-- 目标HP检测区域 -->
+                            <ui:Card Margin="0,0,0,16">
+                                <StackPanel>
+                                    <TextBlock Text="目标 HP 检测区域" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,12"/>
+                                    <TextBlock Text="用于治疗/辅助技能，检测目标（队友）的血量" Foreground="#888" FontSize="12" Margin="0,0,0,8"/>
+                                    <Grid Margin="0,0,0,8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <StackPanel>
+                                            <TextBlock Text="目标HP条区域 (X, Y, 宽, 高)" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                                            <UniformGrid Columns="4">
+                                                <ui:TextBox Text="{Binding AppSettings.TargetHealthBarRegion[0]}" PlaceholderText="X" Margin="0,0,4,0"/>
+                                                <ui:TextBox Text="{Binding AppSettings.TargetHealthBarRegion[1]}" PlaceholderText="Y" Margin="2,0"/>
+                                                <ui:TextBox Text="{Binding AppSettings.TargetHealthBarRegion[2]}" PlaceholderText="宽" Margin="2,0"/>
+                                                <ui:TextBox Text="{Binding AppSettings.TargetHealthBarRegion[3]}" PlaceholderText="高" Margin="4,0,0,0"/>
+                                            </UniformGrid>
+                                        </StackPanel>
+                                        <ui:Button Grid.Column="1" Content="框选" Height="32" Margin="8,0,0,0" VerticalAlignment="Bottom" Command="{Binding SelectRegionCommand}" CommandParameter="TargetHealthBar"/>
+                                        <ui:Button Grid.Column="2" Content="测试" Height="32" Margin="4,0,0,0" VerticalAlignment="Bottom" Appearance="Info" Command="{Binding TestTargetHpDetectionCommand}"/>
                                     </Grid>
                                     <TextBlock Text="💡 Buff/Debuff检测请在「Buff库」中配置" Foreground="#888" FontSize="12"/>
                                 </StackPanel>

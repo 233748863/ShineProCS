@@ -646,6 +646,37 @@ public partial class MainViewModel : ObservableObject, IDisposable
     }
     
     /// <summary>
+    /// 测试目标HP检测（智能分析颜色）
+    /// </summary>
+    [RelayCommand]
+    private void TestTargetHpDetection()
+    {
+        var region = AppSettings.TargetHealthBarRegion;
+        if (region.All(v => v == 0))
+        {
+            ToastManager.Warning("请先设置目标HP条区域", "测试失败");
+            return;
+        }
+        
+        try
+        {
+            // 使用与自身HP相同的颜色配置检测
+            var percent = DetectBarPercent(region, isHealth: true);
+            
+            // 显示高亮框
+            RegionHighlightWindow.ShowHighlight(region[0], region[1], region[2], region[3], 3);
+            
+            OnLog($"目标HP检测测试: {percent:F1}%", 1);
+            ToastManager.Success($"目标HP: {percent:F1}%", "目标HP检测");
+        }
+        catch (Exception ex)
+        {
+            OnLog($"目标HP检测异常: {ex.Message}", 2);
+            ToastManager.Error(ex.Message, "检测失败");
+        }
+    }
+    
+    /// <summary>
     /// 分析区域主色调，返回推荐的HSV范围
     /// </summary>
     private (int hueMin, int hueMax, int satMin, int valMin) AnalyzeBarColor(int[] region)
@@ -883,8 +914,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
             IconRegion = (int[])SelectedSkill.IconRegion.Clone(),
             TemplatePath = SelectedSkill.TemplatePath,
             SimilarityThreshold = SelectedSkill.SimilarityThreshold,
-            MinHp = SelectedSkill.MinHp,
             MinMp = SelectedSkill.MinMp,
+            HpCheckTarget = SelectedSkill.HpCheckTarget,
+            HpThreshold = SelectedSkill.HpThreshold,
             RequireTarget = SelectedSkill.RequireTarget,
             Cooldown = SelectedSkill.Cooldown,
             PreCastKeyCode = SelectedSkill.PreCastKeyCode,
@@ -1054,8 +1086,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
     {
         if (skill == null) return;
         skill.ShowReleaseCondition = false;
-        skill.MinHp = 0;
         skill.MinMp = 0;
+        skill.HpCheckTarget = 0;
+        skill.HpThreshold = 0;
         _hasUnsavedChanges = true;
     }
     
@@ -1142,11 +1175,15 @@ public partial class MainViewModel : ObservableObject, IDisposable
                     break;
                 case "HealthBar": 
                     AppSettings.HealthBarRegion = arr;
-                    ShowRegionPreview(arr, "血条区域预览", region => AppSettings.HealthBarRegion = region);
+                    ShowRegionPreview(arr, "自身血条区域预览", region => AppSettings.HealthBarRegion = region);
                     break;
                 case "ManaBar": 
                     AppSettings.ManaBarRegion = arr;
-                    ShowRegionPreview(arr, "蓝条区域预览", region => AppSettings.ManaBarRegion = region);
+                    ShowRegionPreview(arr, "自身蓝条区域预览", region => AppSettings.ManaBarRegion = region);
+                    break;
+                case "TargetHealthBar": 
+                    AppSettings.TargetHealthBarRegion = arr;
+                    ShowRegionPreview(arr, "目标血条区域预览", region => AppSettings.TargetHealthBarRegion = region);
                     break;
             }
             OnLog($"设置{t}区域: {r.X},{r.Y},{r.Width},{r.Height}", 1);
@@ -1194,6 +1231,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             "Detection" => AppSettings.DetectionRegion,
             "HealthBar" => AppSettings.HealthBarRegion,
             "ManaBar" => AppSettings.ManaBarRegion,
+            "TargetHealthBar" => AppSettings.TargetHealthBarRegion,
             _ => [0, 0, 0, 0]
         };
         
@@ -1204,6 +1242,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 case "Detection": AppSettings.DetectionRegion = r; break;
                 case "HealthBar": AppSettings.HealthBarRegion = r; break;
                 case "ManaBar": AppSettings.ManaBarRegion = r; break;
+                case "TargetHealthBar": AppSettings.TargetHealthBarRegion = r; break;
             }
         });
     }
@@ -1423,11 +1462,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
             if (skill.SimilarityThreshold < 0 || skill.SimilarityThreshold > 1)
                 errors.Add($"技能[{skill.Name}]相似度阈值应在0-1之间");
             
-            if (skill.MinHp < 0 || skill.MinHp > 100)
-                errors.Add($"技能[{skill.Name}]最低HP应在0-100之间");
-            
             if (skill.MinMp < 0 || skill.MinMp > 100)
-                errors.Add($"技能[{skill.Name}]最低MP应在0-100之间");
+                errors.Add($"技能[{skill.Name}]自身MP条件应在0-100之间");
+            
+            if (skill.HpThreshold < 0 || skill.HpThreshold > 100)
+                errors.Add($"技能[{skill.Name}]HP条件应在0-100之间");
             
             if (skill.PreCastKeyCode < 0 || skill.PreCastKeyCode > 255)
                 errors.Add($"技能[{skill.Name}]前置技能按键码无效");

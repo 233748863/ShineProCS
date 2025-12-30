@@ -197,6 +197,14 @@ public partial class SkillCardControl : System.Windows.Controls.UserControl
     }
     
     /// <summary>
+    /// 通用ComboBox选择变更（触发配置变更）
+    /// </summary>
+    private void ComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        ConfigChanged?.Invoke();
+    }
+    
+    /// <summary>
     /// Buff下拉框选择变更
     /// </summary>
     private void BuffComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
