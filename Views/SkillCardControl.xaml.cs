@@ -39,6 +39,9 @@ public partial class SkillCardControl : System.Windows.Controls.UserControl
             _configManager = mainWindow.GetConfigManager();
             RefreshBuffComboBox();
         }
+        
+        // 确保施法类型UI正确显示
+        UpdateCastTypeUI();
     }
     
     /// <summary>
@@ -213,8 +216,17 @@ public partial class SkillCardControl : System.Windows.Controls.UserControl
     /// </summary>
     private void CastTypeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        if (Skill == null) return;
+        
+        // 更新模型
+        var newCastType = (SkillCastType)CastTypeComboBox.SelectedIndex;
+        if (Skill.CastType != newCastType)
+        {
+            Skill.CastType = newCastType;
+            ConfigChanged?.Invoke();
+        }
+        
         UpdateCastTypeUI();
-        ConfigChanged?.Invoke();
     }
     
     /// <summary>
@@ -224,7 +236,13 @@ public partial class SkillCardControl : System.Windows.Controls.UserControl
     {
         if (Skill == null) return;
         
-        var castType = (Models.SkillCastType)Skill.CastType;
+        // 同步 ComboBox 选中项
+        if (CastTypeComboBox.SelectedIndex != (int)Skill.CastType)
+        {
+            CastTypeComboBox.SelectedIndex = (int)Skill.CastType;
+        }
+        
+        var castType = Skill.CastType;
         
         // 瞬发：隐藏所有额外配置
         // 正读条：显示读条时间
@@ -232,22 +250,91 @@ public partial class SkillCardControl : System.Windows.Controls.UserControl
         
         switch (castType)
         {
-            case Models.SkillCastType.Instant:
+            case SkillCastType.Instant:
                 CastDurationPanel.Visibility = Visibility.Collapsed;
                 ChannelInterruptPanel.Visibility = Visibility.Collapsed;
                 break;
                 
-            case Models.SkillCastType.CastTime:
+            case SkillCastType.CastTime:
                 CastDurationPanel.Visibility = Visibility.Visible;
                 CastDurationLabel.Text = "读条时间(毫秒)";
                 ChannelInterruptPanel.Visibility = Visibility.Collapsed;
                 break;
                 
-            case Models.SkillCastType.Channeled:
+            case SkillCastType.Channeled:
                 CastDurationPanel.Visibility = Visibility.Visible;
                 CastDurationLabel.Text = "引导时间(毫秒)";
                 ChannelInterruptPanel.Visibility = Visibility.Visible;
+                UpdateInterruptModeUI();
                 break;
         }
+    }
+    
+    /// <summary>
+    /// 打断模式变更处理
+    /// </summary>
+    private void InterruptModeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (Skill == null) return;
+        
+        var newMode = InterruptModeComboBox.SelectedIndex;
+        if (Skill.ChannelInterruptMode != newMode)
+        {
+            Skill.ChannelInterruptMode = newMode;
+            ConfigChanged?.Invoke();
+        }
+        
+        UpdateInterruptModeUI();
+    }
+    
+    /// <summary>
+    /// 更新打断模式相关UI
+    /// </summary>
+    private void UpdateInterruptModeUI()
+    {
+        if (Skill == null) return;
+        
+        // 同步 ComboBox
+        if (InterruptModeComboBox.SelectedIndex != Skill.ChannelInterruptMode)
+        {
+            InterruptModeComboBox.SelectedIndex = Skill.ChannelInterruptMode;
+        }
+        
+        // 根据模式显示不同配置面板
+        if (Skill.ChannelInterruptMode == 0)
+        {
+            // 固定时间模式
+            FixedTimeInterruptPanel.Visibility = Visibility.Visible;
+            ColorDetectInterruptPanel.Visibility = Visibility.Collapsed;
+        }
+        else
+        {
+            // 点色检测模式
+            FixedTimeInterruptPanel.Visibility = Visibility.Collapsed;
+            ColorDetectInterruptPanel.Visibility = Visibility.Visible;
+            UpdateColorPreview();
+        }
+    }
+    
+    /// <summary>
+    /// 更新颜色预览
+    /// </summary>
+    private void UpdateColorPreview()
+    {
+        if (Skill == null) return;
+        
+        try
+        {
+            var color = Skill.ChannelInterruptColor;
+            if (color.Length >= 3)
+            {
+                var r = (byte)Math.Clamp(color[0], 0, 255);
+                var g = (byte)Math.Clamp(color[1], 0, 255);
+                var b = (byte)Math.Clamp(color[2], 0, 255);
+                ColorPreviewBorder.Background = new System.Windows.Media.SolidColorBrush(
+                    System.Windows.Media.Color.FromRgb(r, g, b));
+            }
+        }
+        catch { }
     }
 }

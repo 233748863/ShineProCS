@@ -128,6 +128,12 @@ public partial class SkillConfigPage : System.Windows.Controls.UserControl
             case "Delete":
                 DeleteSkill(skill);
                 break;
+            case "SelectInterruptPoint":
+                SelectInterruptPoint(skill);
+                break;
+            case "PickInterruptColor":
+                PickInterruptColor(skill);
+                break;
         }
     }
 
@@ -462,6 +468,74 @@ public partial class SkillConfigPage : System.Windows.Controls.UserControl
         if (_viewModel == null) return;
         var index = _viewModel.Skills.IndexOf(skill);
         if (index < _viewModel.Skills.Count - 1) { _viewModel.Skills.Move(index, index + 1); MarkUnsaved(); }
+    }
+    
+    /// <summary>
+    /// 选择引导打断检测点
+    /// </summary>
+    private void SelectInterruptPoint(SkillConfig skill)
+    {
+        var selector = new RegionSelectorWindow(pointMode: true);
+        if (selector.ShowDialog() != true) return;
+        
+        var point = selector.SelectedPoint;
+        skill.ChannelInterruptPoint = [(int)point.X, (int)point.Y];
+        
+        ToastManager.Success($"已设置检测点: ({(int)point.X}, {(int)point.Y})", "取点成功");
+        MarkUnsaved();
+    }
+    
+    /// <summary>
+    /// 取色 - 从屏幕上选择颜色
+    /// </summary>
+    private void PickInterruptColor(SkillConfig skill)
+    {
+        if (_imageInterface == null) return;
+        
+        // 先选择点位
+        var selector = new RegionSelectorWindow(pointMode: true);
+        if (selector.ShowDialog() != true) return;
+        
+        var point = selector.SelectedPoint;
+        int x = (int)point.X;
+        int y = (int)point.Y;
+        
+        try
+        {
+            // 获取该点的颜色
+            var pixel = _imageInterface.GetScreenRegion(x, y, 1, 1);
+            if (pixel == null)
+            {
+                ToastManager.Error("获取颜色失败", "取色");
+                return;
+            }
+            
+            try
+            {
+                var indexer = pixel.GetGenericIndexer<OpenCvSharp.Vec3b>();
+                var color = indexer[0, 0];
+                
+                // BGR -> RGB
+                skill.ChannelInterruptColor = [color.Item2, color.Item1, color.Item0];
+                
+                // 同时更新检测点
+                skill.ChannelInterruptPoint = [x, y];
+                
+                ToastManager.Success($"已取色: RGB({color.Item2}, {color.Item1}, {color.Item0})\n位置: ({x}, {y})", "取色成功");
+                MarkUnsaved();
+                
+                // 刷新卡片显示
+                UpdateCardStatus(skill);
+            }
+            finally
+            {
+                _imageInterface.ReturnMat(pixel);
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastManager.Error($"取色失败: {ex.Message}", "取色");
+        }
     }
 
     #endregion

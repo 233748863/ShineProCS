@@ -118,13 +118,20 @@ public class EnumToIntConverter : IValueConverter
     {
         if (value is Enum enumValue)
             return System.Convert.ToInt32(enumValue);
+        if (value is int intVal)
+            return intVal;
         return 0;
     }
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
     {
         if (value is int intValue)
+        {
+            // 如果目标类型是枚举，转换为枚举
+            if (targetType.IsEnum)
+                return Enum.ToObject(targetType, intValue);
             return intValue;
+        }
         return 0;
     }
 }

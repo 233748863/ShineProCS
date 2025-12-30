@@ -104,6 +104,30 @@ public partial class SkillConfig : ObservableObject
     [ObservableProperty] private int _channelInterruptTime;
     
     /// <summary>
+    /// 引导打断模式
+    /// 0 = 固定时间打断
+    /// 1 = 检测点色打断（当指定位置颜色变化时打断）
+    /// </summary>
+    [ObservableProperty] private int _channelInterruptMode;
+    
+    /// <summary>
+    /// 引导打断检测点 [X, Y]
+    /// 用于点色检测模式
+    /// </summary>
+    [ObservableProperty] private int[] _channelInterruptPoint = [0, 0];
+    
+    /// <summary>
+    /// 引导打断目标颜色 [R, G, B]
+    /// 当检测点颜色接近此颜色时打断
+    /// </summary>
+    [ObservableProperty] private int[] _channelInterruptColor = [255, 255, 255];
+    
+    /// <summary>
+    /// 颜色匹配容差 (0-255)
+    /// </summary>
+    [ObservableProperty] private int _channelColorTolerance = 30;
+    
+    /// <summary>
     /// 前置技能按键码（联动技能）
     /// 当Buff条件不满足时，先释放此按键对应的技能
     /// </summary>

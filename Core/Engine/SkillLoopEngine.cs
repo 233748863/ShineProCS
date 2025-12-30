@@ -471,24 +471,16 @@ public class SkillLoopEngine
             skill.ConsecutiveFailures = 0;
             _cooldownTracker.RecordSkillUse(config.Name, config.Cooldown);
             
-            // 计算实际引导时间
-            var channelTime = config.ChannelInterruptTime > 0 
-                ? config.ChannelInterruptTime 
-                : config.CastDuration;
-            
-            if (channelTime > 0)
+            // 根据打断模式执行不同逻辑
+            if (config.ChannelInterruptMode == 1 && config.ChannelInterruptPoint.Any(v => v > 0))
             {
-                var interruptInfo = config.ChannelInterruptTime > 0 
-                    ? $"打断于 {config.ChannelInterruptTime}ms" 
-                    : "完整引导";
-                Log($"释放: {config.Name} [引导 {channelTime}ms, {interruptInfo}]", 0);
-                
-                // 引导指定时间
-                Thread.Sleep(channelTime);
+                // 点色检测打断模式
+                ExecuteColorDetectChannel(config);
             }
             else
             {
-                Log($"释放: {config.Name} [引导]", 0);
+                // 固定时间打断模式
+                ExecuteFixedTimeChannel(config);
             }
             
             // 释放按键（打断引导或自然结束）
@@ -499,6 +491,105 @@ public class SkillLoopEngine
         
         skill.ConsecutiveFailures++;
         return false;
+    }
+    
+    /// <summary>
+    /// 固定时间引导
+    /// </summary>
+    private void ExecuteFixedTimeChannel(SkillConfig config)
+    {
+        var channelTime = config.ChannelInterruptTime > 0 
+            ? config.ChannelInterruptTime 
+            : config.CastDuration;
+        
+        if (channelTime > 0)
+        {
+            var interruptInfo = config.ChannelInterruptTime > 0 
+                ? $"打断于 {config.ChannelInterruptTime}ms" 
+                : "完整引导";
+            Log($"释放: {config.Name} [引导 {channelTime}ms, {interruptInfo}]", 0);
+            
+            Thread.Sleep(channelTime);
+        }
+        else
+        {
+            Log($"释放: {config.Name} [引导]", 0);
+        }
+    }
+    
+    /// <summary>
+    /// 点色检测引导打断
+    /// </summary>
+    private void ExecuteColorDetectChannel(SkillConfig config)
+    {
+        var maxTime = config.CastDuration > 0 ? config.CastDuration : 10000; // 最大10秒
+        var checkInterval = 50; // 每50ms检测一次
+        var elapsed = 0;
+        
+        var targetColor = config.ChannelInterruptColor;
+        var tolerance = config.ChannelColorTolerance;
+        var point = config.ChannelInterruptPoint;
+        
+        Log($"释放: {config.Name} [引导, 点色检测打断 ({point[0]},{point[1]})]", 0);
+        
+        while (elapsed < maxTime)
+        {
+            Thread.Sleep(checkInterval);
+            elapsed += checkInterval;
+            
+            // 检测点色
+            if (CheckColorMatch(point[0], point[1], targetColor, tolerance))
+            {
+                Log($"检测到目标颜色，打断引导 (已引导 {elapsed}ms)", 0);
+                break;
+            }
+        }
+        
+        if (elapsed >= maxTime)
+        {
+            Log($"引导完成 (达到最大时间 {maxTime}ms)", 0);
+        }
+    }
+    
+    /// <summary>
+    /// 检测指定点的颜色是否匹配目标颜色
+    /// </summary>
+    private bool CheckColorMatch(int x, int y, int[] targetColor, int tolerance)
+    {
+        if (targetColor.Length < 3) return false;
+        
+        try
+        {
+            // 获取单个像素
+            var pixel = _image.GetScreenRegion(x, y, 1, 1);
+            if (pixel == null) return false;
+            
+            try
+            {
+                // 获取像素颜色 (BGR格式)
+                var indexer = pixel.GetGenericIndexer<OpenCvSharp.Vec3b>();
+                var color = indexer[0, 0];
+                
+                var b = color.Item0;
+                var g = color.Item1;
+                var r = color.Item2;
+                
+                // 计算颜色差异
+                var diffR = Math.Abs(r - targetColor[0]);
+                var diffG = Math.Abs(g - targetColor[1]);
+                var diffB = Math.Abs(b - targetColor[2]);
+                
+                return diffR <= tolerance && diffG <= tolerance && diffB <= tolerance;
+            }
+            finally
+            {
+                _image.ReturnMat(pixel);
+            }
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     public SkillCooldownTracker CooldownTracker => _cooldownTracker;
