@@ -80,7 +80,7 @@ public partial class SkillConfig : ObservableObject
     [ObservableProperty] private bool _requireTarget;
     
     /// <summary>
-    /// 技能冷却时间（秒）
+    /// 技能冷却时间（秒）- 作为最大等待时间参考
     /// </summary>
     [ObservableProperty] private double _cooldown;
     
@@ -90,11 +90,40 @@ public partial class SkillConfig : ObservableObject
     [ObservableProperty] private SkillCastType _castType = SkillCastType.Instant;
     
     /// <summary>
-    /// 施法/引导时间（毫秒）
-    /// 正读条：读条完成所需时间
-    /// 引导：完整引导时间
+    /// 施法/引导时间（毫秒）- 作为最大等待时间
+    /// 正读条：最大读条时间
+    /// 引导：最大引导时间
     /// </summary>
     [ObservableProperty] private int _castDuration;
+    
+    /// <summary>
+    /// 是否使用视觉检测判断读条/引导结束
+    /// true = 检测到特定状态时结束
+    /// false = 等待固定时间
+    /// </summary>
+    [ObservableProperty] private bool _useCastEndDetection;
+    
+    /// <summary>
+    /// 读条/引导结束检测模式
+    /// 0 = 检测读条条消失（点色变化）
+    /// 1 = 检测技能图标变化（模板匹配）
+    /// </summary>
+    [ObservableProperty] private int _castEndDetectionMode;
+    
+    /// <summary>
+    /// 读条结束检测点 [X, Y]
+    /// </summary>
+    [ObservableProperty] private int[] _castEndDetectionPoint = [0, 0];
+    
+    /// <summary>
+    /// 读条结束目标颜色 [R, G, B] - 读条条消失后的背景色
+    /// </summary>
+    [ObservableProperty] private int[] _castEndColor = [0, 0, 0];
+    
+    /// <summary>
+    /// 读条结束颜色容差
+    /// </summary>
+    [ObservableProperty] private int _castEndColorTolerance = 30;
     
     /// <summary>
     /// 引导打断时间（毫秒）

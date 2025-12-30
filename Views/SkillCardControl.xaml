@@ -150,6 +150,7 @@
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
                         
                         <StackPanel Margin="0,0,8,0">
@@ -163,11 +164,68 @@
                         </StackPanel>
                         
                         <StackPanel Grid.Column="1" Margin="8,0,0,0" x:Name="CastDurationPanel" Visibility="Collapsed">
-                            <TextBlock x:Name="CastDurationLabel" Text="读条时间(毫秒)" FontSize="12" Foreground="#999" Margin="0,0,0,4"/>
+                            <TextBlock x:Name="CastDurationLabel" Text="最大读条时间(毫秒)" FontSize="12" Foreground="#999" Margin="0,0,0,4"/>
                             <ui:TextBox Text="{Binding CastDuration}" TextChanged="OnConfigChanged"/>
                         </StackPanel>
                         
-                        <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Margin="0,8,0,0" x:Name="ChannelInterruptPanel" Visibility="Collapsed">
+                        <!-- 读条结束检测配置 -->
+                        <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Margin="0,8,0,0" x:Name="CastEndDetectionPanel" Visibility="Collapsed">
+                            <CheckBox x:Name="UseCastEndDetectionCheck" 
+                                      Content="使用视觉检测判断读条结束（推荐）" 
+                                      IsChecked="{Binding UseCastEndDetection}"
+                                      Checked="UseCastEndDetection_Changed" Unchecked="UseCastEndDetection_Changed"/>
+                            
+                            <StackPanel x:Name="CastEndDetectionConfig" Margin="0,8,0,0" Visibility="Collapsed">
+                                <TextBlock Text="检测方式" FontSize="12" Foreground="#999" Margin="0,0,0,4"/>
+                                <ComboBox x:Name="CastEndModeComboBox" Margin="0,0,0,8" SelectionChanged="CastEndModeComboBox_SelectionChanged">
+                                    <ComboBoxItem Content="🎨 点色检测" ToolTip="检测读条条位置的颜色变化"/>
+                                    <ComboBoxItem Content="🖼️ 模板匹配" ToolTip="检测技能图标恢复可用状态"/>
+                                </ComboBox>
+                                
+                                <!-- 点色检测配置 -->
+                                <StackPanel x:Name="CastEndColorPanel">
+                                    <TextBlock Text="检测点位置（读条条上的某个点）" FontSize="12" Foreground="#999" Margin="0,0,0,4"/>
+                                    <Grid Margin="0,0,0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <ui:TextBox Text="{Binding CastEndDetectionPoint[0]}" PlaceholderText="X" Margin="0,0,4,0" TextChanged="OnConfigChanged"/>
+                                        <ui:TextBox Grid.Column="1" Text="{Binding CastEndDetectionPoint[1]}" PlaceholderText="Y" Margin="4,0,0,0" TextChanged="OnConfigChanged"/>
+                                        <ui:Button Grid.Column="2" Content="取点" Height="32" Margin="8,0,0,0" Tag="SelectCastEndPoint" Click="ActionButton_Click"/>
+                                    </Grid>
+                                    
+                                    <TextBlock Text="读条结束后的颜色（背景色）" FontSize="12" Foreground="#999" Margin="0,0,0,4"/>
+                                    <Grid Margin="0,0,0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <ui:TextBox Text="{Binding CastEndColor[0]}" PlaceholderText="R" Margin="0,0,4,0" TextChanged="OnConfigChanged"/>
+                                        <ui:TextBox Grid.Column="1" Text="{Binding CastEndColor[1]}" PlaceholderText="G" Margin="2,0" TextChanged="OnConfigChanged"/>
+                                        <ui:TextBox Grid.Column="2" Text="{Binding CastEndColor[2]}" PlaceholderText="B" Margin="4,0,0,0" TextChanged="OnConfigChanged"/>
+                                        <Border Grid.Column="3" x:Name="CastEndColorPreview" Width="32" Height="32" CornerRadius="4" Margin="8,0,0,0" Background="#000"/>
+                                        <ui:Button Grid.Column="4" Content="取色" Height="32" Margin="4,0,0,0" Tag="PickCastEndColor" Click="ActionButton_Click"/>
+                                    </Grid>
+                                    
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="颜色容差:" FontSize="12" Foreground="#999" VerticalAlignment="Center"/>
+                                        <ui:TextBox Text="{Binding CastEndColorTolerance}" Width="60" Margin="8,0,0,0" TextChanged="OnConfigChanged"/>
+                                    </StackPanel>
+                                </StackPanel>
+                                
+                                <!-- 模板匹配说明 -->
+                                <TextBlock x:Name="CastEndTemplateHint" Text="将使用技能图标模板检测技能是否恢复可用状态" 
+                                           FontSize="11" Foreground="#888" TextWrapping="Wrap" Visibility="Collapsed"/>
+                            </StackPanel>
+                        </StackPanel>
+                        
+                        <!-- 引导打断配置 -->
+                        <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Margin="0,8,0,0" x:Name="ChannelInterruptPanel" Visibility="Collapsed">
                             <TextBlock Text="打断方式" FontSize="12" Foreground="#999" Margin="0,0,0,4"/>
                             <ComboBox x:Name="InterruptModeComboBox" Margin="0,0,0,8" SelectionChanged="InterruptModeComboBox_SelectionChanged">
                                 <ComboBoxItem Content="⏱️ 固定时间打断"/>
@@ -217,17 +275,10 @@
                                     <ui:Button Grid.Column="4" Content="取色" Height="32" Margin="4,0,0,0" Tag="PickInterruptColor" Click="ActionButton_Click"/>
                                 </Grid>
                                 
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel>
-                                        <TextBlock Text="颜色容差" FontSize="12" Foreground="#999" Margin="0,0,0,4"/>
-                                        <ui:TextBox Text="{Binding ChannelColorTolerance}" TextChanged="OnConfigChanged"/>
-                                    </StackPanel>
-                                    <TextBlock Grid.Column="1" Text="容差越大匹配越宽松" FontSize="11" Foreground="#666" VerticalAlignment="Bottom" Margin="8,0,0,4"/>
-                                </Grid>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="颜色容差:" FontSize="12" Foreground="#999" VerticalAlignment="Center"/>
+                                    <ui:TextBox Text="{Binding ChannelColorTolerance}" Width="60" Margin="8,0,0,0" TextChanged="OnConfigChanged"/>
+                                </StackPanel>
                             </StackPanel>
                         </StackPanel>
                     </Grid>

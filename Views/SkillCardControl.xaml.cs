@@ -245,29 +245,132 @@ public partial class SkillCardControl : System.Windows.Controls.UserControl
         var castType = Skill.CastType;
         
         // 瞬发：隐藏所有额外配置
-        // 正读条：显示读条时间
-        // 引导：显示引导时间和打断时间
+        // 正读条：显示读条时间和结束检测
+        // 引导：显示引导时间、结束检测和打断配置
         
         switch (castType)
         {
             case SkillCastType.Instant:
                 CastDurationPanel.Visibility = Visibility.Collapsed;
+                CastEndDetectionPanel.Visibility = Visibility.Collapsed;
                 ChannelInterruptPanel.Visibility = Visibility.Collapsed;
                 break;
                 
             case SkillCastType.CastTime:
                 CastDurationPanel.Visibility = Visibility.Visible;
-                CastDurationLabel.Text = "读条时间(毫秒)";
+                CastDurationLabel.Text = "最大读条时间(毫秒)";
+                CastEndDetectionPanel.Visibility = Visibility.Visible;
                 ChannelInterruptPanel.Visibility = Visibility.Collapsed;
+                UpdateCastEndDetectionUI();
                 break;
                 
             case SkillCastType.Channeled:
                 CastDurationPanel.Visibility = Visibility.Visible;
-                CastDurationLabel.Text = "引导时间(毫秒)";
+                CastDurationLabel.Text = "最大引导时间(毫秒)";
+                CastEndDetectionPanel.Visibility = Visibility.Visible;
                 ChannelInterruptPanel.Visibility = Visibility.Visible;
+                UpdateCastEndDetectionUI();
                 UpdateInterruptModeUI();
                 break;
         }
+    }
+    
+    /// <summary>
+    /// 读条结束检测开关变更
+    /// </summary>
+    private void UseCastEndDetection_Changed(object sender, RoutedEventArgs e)
+    {
+        UpdateCastEndDetectionUI();
+        ConfigChanged?.Invoke();
+    }
+    
+    /// <summary>
+    /// 读条结束检测模式变更
+    /// </summary>
+    private void CastEndModeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (Skill == null) return;
+        
+        var newMode = CastEndModeComboBox.SelectedIndex;
+        if (Skill.CastEndDetectionMode != newMode)
+        {
+            Skill.CastEndDetectionMode = newMode;
+            ConfigChanged?.Invoke();
+        }
+        
+        UpdateCastEndDetectionModeUI();
+    }
+    
+    /// <summary>
+    /// 更新读条结束检测UI
+    /// </summary>
+    private void UpdateCastEndDetectionUI()
+    {
+        if (Skill == null) return;
+        
+        // 同步复选框
+        if (UseCastEndDetectionCheck.IsChecked != Skill.UseCastEndDetection)
+        {
+            UseCastEndDetectionCheck.IsChecked = Skill.UseCastEndDetection;
+        }
+        
+        // 显示/隐藏详细配置
+        CastEndDetectionConfig.Visibility = Skill.UseCastEndDetection ? Visibility.Visible : Visibility.Collapsed;
+        
+        if (Skill.UseCastEndDetection)
+        {
+            // 同步检测模式
+            if (CastEndModeComboBox.SelectedIndex != Skill.CastEndDetectionMode)
+            {
+                CastEndModeComboBox.SelectedIndex = Skill.CastEndDetectionMode;
+            }
+            
+            UpdateCastEndDetectionModeUI();
+        }
+    }
+    
+    /// <summary>
+    /// 更新读条结束检测模式UI
+    /// </summary>
+    private void UpdateCastEndDetectionModeUI()
+    {
+        if (Skill == null) return;
+        
+        if (Skill.CastEndDetectionMode == 0)
+        {
+            // 点色检测
+            CastEndColorPanel.Visibility = Visibility.Visible;
+            CastEndTemplateHint.Visibility = Visibility.Collapsed;
+            UpdateCastEndColorPreview();
+        }
+        else
+        {
+            // 模板匹配
+            CastEndColorPanel.Visibility = Visibility.Collapsed;
+            CastEndTemplateHint.Visibility = Visibility.Visible;
+        }
+    }
+    
+    /// <summary>
+    /// 更新读条结束颜色预览
+    /// </summary>
+    private void UpdateCastEndColorPreview()
+    {
+        if (Skill == null) return;
+        
+        try
+        {
+            var color = Skill.CastEndColor;
+            if (color.Length >= 3)
+            {
+                var r = (byte)Math.Clamp(color[0], 0, 255);
+                var g = (byte)Math.Clamp(color[1], 0, 255);
+                var b = (byte)Math.Clamp(color[2], 0, 255);
+                CastEndColorPreview.Background = new System.Windows.Media.SolidColorBrush(
+                    System.Windows.Media.Color.FromRgb(r, g, b));
+            }
+        }
+        catch { }
     }
     
     /// <summary>

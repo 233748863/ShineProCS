@@ -438,12 +438,19 @@ public class SkillLoopEngine
             skill.ConsecutiveFailures = 0;
             _cooldownTracker.RecordSkillUse(config.Name, config.Cooldown);
             
-            var castTime = config.CastDuration;
-            if (castTime > 0)
+            var maxCastTime = config.CastDuration;
+            
+            if (config.UseCastEndDetection)
             {
-                Log($"释放: {config.Name} [读条 {castTime}ms]", 0);
-                // 等待读条完成
-                Thread.Sleep(castTime);
+                // 使用视觉检测判断读条结束
+                Log($"释放: {config.Name} [读条, 视觉检测结束]", 0);
+                WaitForCastEnd(config, maxCastTime);
+            }
+            else if (maxCastTime > 0)
+            {
+                // 固定时间等待
+                Log($"释放: {config.Name} [读条 {maxCastTime}ms]", 0);
+                Thread.Sleep(maxCastTime);
             }
             else
             {
@@ -455,6 +462,74 @@ public class SkillLoopEngine
         
         skill.ConsecutiveFailures++;
         return false;
+    }
+    
+    /// <summary>
+    /// 等待读条结束（视觉检测）
+    /// </summary>
+    private void WaitForCastEnd(SkillConfig config, int maxWaitTime)
+    {
+        var checkInterval = 50;
+        var elapsed = 0;
+        var maxTime = maxWaitTime > 0 ? maxWaitTime : 10000;
+        
+        while (elapsed < maxTime)
+        {
+            Thread.Sleep(checkInterval);
+            elapsed += checkInterval;
+            
+            if (config.CastEndDetectionMode == 0)
+            {
+                // 点色检测
+                var point = config.CastEndDetectionPoint;
+                if (point.Any(v => v > 0) && CheckColorMatch(point[0], point[1], config.CastEndColor, config.CastEndColorTolerance))
+                {
+                    Log($"检测到读条结束 (已等待 {elapsed}ms)", 0);
+                    return;
+                }
+            }
+            else
+            {
+                // 模板匹配 - 检测技能图标是否恢复可用
+                if (CheckSkillAvailable(config))
+                {
+                    Log($"检测到技能可用 (已等待 {elapsed}ms)", 0);
+                    return;
+                }
+            }
+        }
+        
+        Log($"读条等待超时 ({maxTime}ms)", 1);
+    }
+    
+    /// <summary>
+    /// 检测技能是否可用（模板匹配）
+    /// </summary>
+    private bool CheckSkillAvailable(SkillConfig config)
+    {
+        if (string.IsNullOrEmpty(config.TemplatePath)) return false;
+        
+        var region = config.IconRegion;
+        if (region.All(v => v == 0)) return false;
+        
+        var template = _templatePreloader.GetTemplate(config.TemplatePath);
+        if (template == null || template.Empty()) return false;
+        
+        var frame = _image.GetScreenRegion(region[0], region[1], region[2], region[3]);
+        if (frame == null) return false;
+        
+        try
+        {
+            using var result = new Mat();
+            Cv2.MatchTemplate(frame, template, result, TemplateMatchModes.CCoeffNormed);
+            Cv2.MinMaxLoc(result, out _, out double maxVal, out _, out _);
+            
+            return maxVal >= config.SimilarityThreshold;
+        }
+        finally
+        {
+            _image.ReturnMat(frame);
+        }
     }
     
     /// <summary>
@@ -477,9 +552,20 @@ public class SkillLoopEngine
                 // 点色检测打断模式
                 ExecuteColorDetectChannel(config);
             }
-            else
+            else if (config.ChannelInterruptTime > 0)
             {
                 // 固定时间打断模式
+                ExecuteFixedTimeChannel(config);
+            }
+            else if (config.UseCastEndDetection)
+            {
+                // 使用视觉检测判断引导结束
+                Log($"释放: {config.Name} [引导, 视觉检测结束]", 0);
+                WaitForCastEnd(config, config.CastDuration);
+            }
+            else
+            {
+                // 完整引导
                 ExecuteFixedTimeChannel(config);
             }
             

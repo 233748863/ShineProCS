@@ -134,6 +134,12 @@ public partial class SkillConfigPage : System.Windows.Controls.UserControl
             case "PickInterruptColor":
                 PickInterruptColor(skill);
                 break;
+            case "SelectCastEndPoint":
+                SelectCastEndPoint(skill);
+                break;
+            case "PickCastEndColor":
+                PickCastEndColor(skill);
+                break;
         }
     }
 
@@ -525,6 +531,68 @@ public partial class SkillConfigPage : System.Windows.Controls.UserControl
                 MarkUnsaved();
                 
                 // 刷新卡片显示
+                UpdateCardStatus(skill);
+            }
+            finally
+            {
+                _imageInterface.ReturnMat(pixel);
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastManager.Error($"取色失败: {ex.Message}", "取色");
+        }
+    }
+    
+    /// <summary>
+    /// 选择读条结束检测点
+    /// </summary>
+    private void SelectCastEndPoint(SkillConfig skill)
+    {
+        var selector = new RegionSelectorWindow(pointMode: true);
+        if (selector.ShowDialog() != true) return;
+        
+        var point = selector.SelectedPoint;
+        skill.CastEndDetectionPoint = [(int)point.X, (int)point.Y];
+        
+        ToastManager.Success($"已设置检测点: ({(int)point.X}, {(int)point.Y})", "取点成功");
+        MarkUnsaved();
+    }
+    
+    /// <summary>
+    /// 取色 - 读条结束颜色
+    /// </summary>
+    private void PickCastEndColor(SkillConfig skill)
+    {
+        if (_imageInterface == null) return;
+        
+        var selector = new RegionSelectorWindow(pointMode: true);
+        if (selector.ShowDialog() != true) return;
+        
+        var point = selector.SelectedPoint;
+        int x = (int)point.X;
+        int y = (int)point.Y;
+        
+        try
+        {
+            var pixel = _imageInterface.GetScreenRegion(x, y, 1, 1);
+            if (pixel == null)
+            {
+                ToastManager.Error("获取颜色失败", "取色");
+                return;
+            }
+            
+            try
+            {
+                var indexer = pixel.GetGenericIndexer<OpenCvSharp.Vec3b>();
+                var color = indexer[0, 0];
+                
+                // BGR -> RGB
+                skill.CastEndColor = [color.Item2, color.Item1, color.Item0];
+                skill.CastEndDetectionPoint = [x, y];
+                
+                ToastManager.Success($"已取色: RGB({color.Item2}, {color.Item1}, {color.Item0})\n位置: ({x}, {y})", "取色成功");
+                MarkUnsaved();
                 UpdateCardStatus(skill);
             }
             finally
