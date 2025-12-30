@@ -4,6 +4,7 @@ using System.Windows.Media.Imaging;
 using ShineProCS.Core.Interfaces;
 using ShineProCS.Core.Services;
 using ShineProCS.Models;
+using ShineProCS.ViewModels;
 using WinUserControl = System.Windows.Controls.UserControl;
 using WinApp = System.Windows.Application;
 
@@ -11,7 +12,7 @@ namespace ShineProCS.Views;
 
 public partial class BuffLibraryPage : WinUserControl
 {
-    private ConfigManager? _configManager;
+    private MainViewModel? _viewModel;
     private IImageInterface? _imageInterface;
     private BuffConfig? _selectedBuff;
     
@@ -23,23 +24,21 @@ public partial class BuffLibraryPage : WinUserControl
     
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
-        // 从MainWindow获取ConfigManager和ImageInterface
-        if (WinApp.Current.MainWindow is MainWindow mainWindow)
+        // 从MainWindow获取ViewModel
+        if (WinApp.Current.MainWindow is MainWindow mainWindow && 
+            mainWindow.DataContext is MainViewModel vm)
         {
-            _configManager = mainWindow.GetConfigManager();
-            _imageInterface = (mainWindow.DataContext as ViewModels.MainViewModel)?.ImageInterface;
+            _viewModel = vm;
+            _imageInterface = vm.ImageInterface;
             
-            // 直接绑定ObservableCollection，自动更新UI
-            if (_configManager != null)
-            {
-                BuffList.ItemsSource = _configManager.AppSettings.BuffLibrary;
-            }
+            // 绑定到ViewModel的AppSettings.BuffLibrary
+            BuffList.ItemsSource = vm.AppSettings.BuffLibrary;
         }
     }
     
     private void AddBuff_Click(object sender, RoutedEventArgs e)
     {
-        if (_configManager == null) return;
+        if (_viewModel == null) return;
         
         var newBuff = new BuffConfig
         {
@@ -49,10 +48,9 @@ public partial class BuffLibraryPage : WinUserControl
             Enabled = true
         };
         
-        _configManager.AppSettings.BuffLibrary.Add(newBuff);
-        SelectBuff(newBuff);
+        _viewModel.AppSettings.BuffLibrary.Add(newBuff);
+        BuffList.SelectedItem = newBuff;
         
-        // 注意：添加后不自动保存，需要用户点击保存按钮
         ToastManager.Info("已添加新Buff，请编辑后点击保存", "Buff库");
     }
     
@@ -119,7 +117,7 @@ public partial class BuffLibraryPage : WinUserControl
     
     private void DeleteBuff_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is FrameworkElement fe && fe.Tag is BuffConfig buff && _configManager != null)
+        if (sender is FrameworkElement fe && fe.Tag is BuffConfig buff && _viewModel != null)
         {
             var result = System.Windows.MessageBox.Show(
                 $"确定要删除 \"{buff.DisplayName}\" 吗？\n\n注意：引用此Buff的技能配置将失效。",
@@ -129,7 +127,7 @@ public partial class BuffLibraryPage : WinUserControl
             
             if (result == MessageBoxResult.Yes)
             {
-                _configManager.AppSettings.BuffLibrary.Remove(buff);
+                _viewModel.AppSettings.BuffLibrary.Remove(buff);
                 
                 if (_selectedBuff == buff)
                 {
@@ -139,7 +137,7 @@ public partial class BuffLibraryPage : WinUserControl
                 }
                 
                 // 保存配置到文件
-                _configManager.SaveAll();
+                _viewModel.ConfigManager.SaveAll();
                 
                 ToastManager.Success($"已删除 {buff.DisplayName}", "Buff库");
             }
@@ -258,7 +256,7 @@ public partial class BuffLibraryPage : WinUserControl
     
     private void SaveBuff_Click(object sender, RoutedEventArgs e)
     {
-        if (_selectedBuff == null || _configManager == null) return;
+        if (_selectedBuff == null || _viewModel == null) return;
         
         // 验证名称
         var name = BuffNameBox.Text.Trim();
@@ -269,7 +267,7 @@ public partial class BuffLibraryPage : WinUserControl
         }
         
         // 检查名称是否重复
-        var duplicate = _configManager.AppSettings.BuffLibrary
+        var duplicate = _viewModel.AppSettings.BuffLibrary
             .FirstOrDefault(b => b != _selectedBuff && b.Name == name);
         if (duplicate != null)
         {
@@ -294,7 +292,7 @@ public partial class BuffLibraryPage : WinUserControl
             _selectedBuff.SimilarityThreshold = Math.Clamp(threshold, 0.0, 1.0);
         
         // 保存配置
-        _configManager.SaveAll();
+        _viewModel.ConfigManager.SaveAll();
         
         ToastManager.Success($"已保存 {_selectedBuff.DisplayName}", "Buff库");
     }
