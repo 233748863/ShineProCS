@@ -29,15 +29,13 @@ public partial class BuffLibraryPage : WinUserControl
         {
             _configManager = mainWindow.GetConfigManager();
             _imageInterface = (mainWindow.DataContext as ViewModels.MainViewModel)?.ImageInterface;
-            RefreshBuffList();
+            
+            // 直接绑定ObservableCollection，自动更新UI
+            if (_configManager != null)
+            {
+                BuffList.ItemsSource = _configManager.AppSettings.BuffLibrary;
+            }
         }
-    }
-    
-    private void RefreshBuffList()
-    {
-        if (_configManager == null) return;
-        BuffList.ItemsSource = null;
-        BuffList.ItemsSource = _configManager.AppSettings.BuffLibrary;
     }
     
     private void AddBuff_Click(object sender, RoutedEventArgs e)
@@ -53,10 +51,10 @@ public partial class BuffLibraryPage : WinUserControl
         };
         
         _configManager.AppSettings.BuffLibrary.Add(newBuff);
-        RefreshBuffList();
         SelectBuff(newBuff);
         
-        ToastManager.Success("已添加新Buff", "Buff库");
+        // 注意：添加后不自动保存，需要用户点击保存按钮
+        ToastManager.Info("已添加新Buff，请编辑后点击保存", "Buff库");
     }
     
     private void BuffItem_Click(object sender, MouseButtonEventArgs e)
@@ -141,7 +139,9 @@ public partial class BuffLibraryPage : WinUserControl
                     EmptyHint.Visibility = Visibility.Visible;
                 }
                 
-                RefreshBuffList();
+                // 保存配置到文件
+                _configManager.SaveAll();
+                
                 ToastManager.Success($"已删除 {buff.DisplayName}", "Buff库");
             }
         }
@@ -296,7 +296,6 @@ public partial class BuffLibraryPage : WinUserControl
         
         // 保存配置
         _configManager.SaveAll();
-        RefreshBuffList();
         
         ToastManager.Success($"已保存 {_selectedBuff.DisplayName}", "Buff库");
     }
