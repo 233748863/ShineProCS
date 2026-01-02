@@ -14,9 +14,9 @@ if (Test-Path $publishDir) {
     Remove-Item -Recurse -Force $publishDir
 }
 
-# 发布单文件
+# 发布单文件（自包含模式，无需安装.NET运行时）
 Write-Host "正在编译发布..." -ForegroundColor Green
-dotnet publish -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o $publishDir
+dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o $publishDir
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "编译失败!" -ForegroundColor Red
@@ -40,6 +40,14 @@ if (-not (Test-Path $configDefaultDir)) {
 }
 Copy-Item ".\config\appsettings.json" -Destination $configDefaultDir -Force
 Copy-Item ".\config\skills.json" -Destination $configDefaultDir -Force
+
+# 复制运行时配置目录（程序启动时需要）
+$configDir = "$publishDir\config"
+if (-not (Test-Path $configDir)) {
+    New-Item -ItemType Directory -Path $configDir | Out-Null
+}
+Copy-Item ".\config\appsettings.json" -Destination $configDir -Force
+Copy-Item ".\config\skills.json" -Destination $configDir -Force
 
 # 复制使用说明文档
 Write-Host "复制使用说明文档..." -ForegroundColor Green
