@@ -29,4 +29,10 @@
     </None>
   </ItemGroup>
 
+  <!-- Exclude Tests folder from compilation -->
+  <ItemGroup>
+    <Compile Remove="Tests\**" />
+    <None Remove="Tests\**" />
+  </ItemGroup>
+
 </Project>

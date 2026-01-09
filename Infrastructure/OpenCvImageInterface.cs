@@ -102,8 +102,26 @@ public class OpenCvImageInterface : IImageInterface, IDisposable
         _useWgc = false;
     }
 
+    // 日志回调（可选，用于调试）
+    private Action<string, int>? _logCallback;
+    
+    /// <summary>
+    /// 设置日志回调函数
+    /// </summary>
+    /// <param name="callback">日志回调，参数为消息和日志级别(0=调试,1=信息,2=警告)</param>
+    public void SetLogCallback(Action<string, int>? callback)
+    {
+        _logCallback = callback;
+    }
+    
+    private void Log(string message, int level = 0)
+    {
+        _logCallback?.Invoke(message, level);
+    }
+
     public Mat? GetScreenRegion(int x, int y, int w, int h)
     {
+        // 基本参数验证
         if (w <= 0 || h <= 0) return null;
         
         // 优先使用WGC
@@ -115,18 +133,34 @@ public class OpenCvImageInterface : IImageInterface, IDisposable
                 int clientX = x - _clientX;
                 int clientY = y - _clientY;
                 
-                // 检查坐标是否在窗口范围内
-                if (clientX >= 0 && clientY >= 0)
+                // 完整边界检查：检查起始坐标是否为负
+                if (clientX < 0 || clientY < 0)
                 {
-                    var region = _wgc.CaptureRegion(clientX, clientY, w, h);
-                    if (region != null)
-                        return region;
+                    Log($"WGC坐标越界: 起始坐标({clientX}, {clientY})为负值，回退到GDI", 1);
+                    return GetScreenRegionGdi(x, y, w, h);
                 }
+                
+                // 完整边界检查：检查区域是否超出窗口范围
+                if (clientX + w > _wgc.Width || clientY + h > _wgc.Height)
+                {
+                    Log($"WGC区域超出窗口: 请求区域({clientX},{clientY},{w},{h}) 超出窗口尺寸({_wgc.Width},{_wgc.Height})，回退到GDI", 1);
+                    return GetScreenRegionGdi(x, y, w, h);
+                }
+                
+                var region = _wgc.CaptureRegion(clientX, clientY, w, h);
+                if (region != null)
+                    return region;
+                
+                // WGC截图失败，回退到GDI
+                Log("WGC截图返回null，回退到GDI", 0);
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Log($"WGC截图异常: {ex.Message}，回退到GDI", 1);
+            }
         }
         
-        // 回退到GDI截图（使用屏幕坐标）
+        // 回退到GDI截图（使用原始屏幕坐标）
         return GetScreenRegionGdi(x, y, w, h);
     }
 

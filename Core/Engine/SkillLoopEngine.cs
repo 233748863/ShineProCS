@@ -7,6 +7,10 @@ using ShineProCS.Models;
 using ShineProCS.Utils;
 using OpenCvSharp;
 
+using EngineConst = ShineProCS.Core.Constants.Engine;
+using DetectionConst = ShineProCS.Core.Constants.Detection;
+using VK = ShineProCS.Core.Constants.VirtualKeys;
+
 namespace ShineProCS.Core.Engine;
 
 /// <summary>
@@ -33,6 +37,7 @@ public class SkillLoopEngine
     private readonly ConfigWatcher _configWatcher;
     private readonly StrategyLoader _strategyLoader;
     private readonly SkillCooldownTracker _cooldownTracker = new();
+    private readonly StateTracker _stateTracker = new();
     private List<ISkillStrategy> _strategies;
     
     #endregion
@@ -40,7 +45,9 @@ public class SkillLoopEngine
     #region 运行状态
     
     private List<SkillRuntimeState> _skillStates = [];
-    private volatile bool _isRunning, _isPaused;
+    private readonly object _stateLock = new();
+    private readonly ReaderWriterLockSlim _skillStatesLock = new();
+    private bool _isRunning, _isPaused;
     private CancellationTokenSource? _cts;
     private Task? _loopTask;
     private Task? _captureTask;
@@ -52,7 +59,6 @@ public class SkillLoopEngine
     private BlockingCollection<Mat> _imageQueue = null!;
     private int _unchangedFrameCount;
     private int _lastSampleSum;
-    private const int SampleStride = 16;
     
     #endregion
 
@@ -127,58 +133,108 @@ public class SkillLoopEngine
         try
         {
             _config.LoadConfigs();
-            _skillStates = _config.Skills.Select(s => new SkillRuntimeState(s)).ToList();
-            Log($"已加载 {_skillStates.Count} 个技能", 1);
+            var newStates = _config.Skills.Select(s => new SkillRuntimeState(s)).ToList();
+            
+            _skillStatesLock.EnterWriteLock();
+            try
+            {
+                _skillStates = newStates;
+            }
+            finally
+            {
+                _skillStatesLock.ExitWriteLock();
+            }
+            
+            Log($"已加载 {newStates.Count} 个技能", 1);
         }
         catch (Exception ex)
         {
-            Log($"加载技能配置失败: {ex.Message}", 2);
+            // 配置加载失败时保留旧配置，不修改 _skillStates
+            Log($"加载技能配置失败，保留原有配置: {ex.Message}", 2);
         }
     }
 
     public void Start()
     {
-        if (_isRunning) return;
-        _cts = new CancellationTokenSource();
-        _isRunning = true;
-        _isPaused = false;
-        _perfMonitor.Reset();
-        _unchangedFrameCount = 0;
-        _captureTask = Task.Run(() => CaptureLoop(_cts.Token));
-        _loopTask = Task.Run(() => MainLoop(_cts.Token));
-        Log("引擎已启动", 1);
+        lock (_stateLock)
+        {
+            if (_isRunning) return;
+            _cts = new CancellationTokenSource();
+            _isRunning = true;
+            _isPaused = false;
+            _perfMonitor.Reset();
+            _unchangedFrameCount = 0;
+            _captureTask = Task.Run(() => CaptureLoop(_cts.Token));
+            _loopTask = Task.Run(() => MainLoop(_cts.Token));
+            Log("引擎已启动", 1);
+        }
         NotifyStatus();
     }
 
     public void Stop()
     {
-        if (!_isRunning) return;
-        _cts?.Cancel();
-        try { Task.WaitAll([_loopTask!, _captureTask!], TimeSpan.FromSeconds(3)); }
+        CancellationTokenSource? ctsToCancel;
+        Task? loopToWait, captureToWait;
+        
+        lock (_stateLock)
+        {
+            if (!_isRunning) return;
+            ctsToCancel = _cts;
+            loopToWait = _loopTask;
+            captureToWait = _captureTask;
+        }
+        
+        ctsToCancel?.Cancel();
+        try 
+        { 
+            var tasks = new List<Task>();
+            if (loopToWait != null) tasks.Add(loopToWait);
+            if (captureToWait != null) tasks.Add(captureToWait);
+            if (tasks.Count > 0) Task.WaitAll(tasks.ToArray(), TimeSpan.FromSeconds(3)); 
+        }
         catch (AggregateException ex) { Log($"引擎停止时发生异常: {ex.InnerExceptions.FirstOrDefault()?.Message}", 2); }
+        
         while (_imageQueue.TryTake(out var mat)) _image.ReturnMat(mat);
-        _cts?.Dispose();
-        _isRunning = _isPaused = false;
+        
+        lock (_stateLock)
+        {
+            _cts?.Dispose();
+            _cts = null;
+            _loopTask = null;
+            _captureTask = null;
+            _isRunning = false;
+            _isPaused = false;
+        }
         Log("引擎已停止", 1);
         NotifyStatus();
     }
 
     public void TogglePause()
     {
-        if (!_isRunning) return;
-        _isPaused = !_isPaused;
-        Log(_isPaused ? "引擎已暂停" : "引擎已恢复", 1);
+        lock (_stateLock)
+        {
+            if (!_isRunning) return;
+            _isPaused = !_isPaused;
+            Log(_isPaused ? "引擎已暂停" : "引擎已恢复", 1);
+        }
         NotifyStatus();
     }
 
     public EngineStatus GetStatus()
     {
+        bool isRunning, isPaused;
+        lock (_stateLock)
+        {
+            isRunning = _isRunning;
+            isPaused = _isPaused;
+        }
+        
         var m = _perfMonitor.GetMetrics();
         return new EngineStatus
         {
-            IsRunning = _isRunning, 
-            IsPaused = _isPaused,
-            Mode = _isRunning ? (_isPaused ? "已暂停" : "运行中") : "已停止",
+            IsRunning = isRunning, 
+            IsPaused = isPaused,
+            Mode = isRunning ? (isPaused ? "已暂停" : "运行中") : "已停止",
             ExecutionCount = m.TotalExecutions, 
             AvgResponseTime = m.AverageResponseTime, 
             SuccessRate = m.SuccessRate,
@@ -193,7 +249,10 @@ public class SkillLoopEngine
         var region = _config.AppSettings.DetectionRegion;
         while (!token.IsCancellationRequested)
         {
-            if (_isPaused) { Thread.Sleep(100); continue; }
+            bool isPaused;
+            lock (_stateLock) { isPaused = _isPaused; }
+            
+            if (isPaused) { Thread.Sleep(EngineConst.PauseCheckIntervalMs); continue; }
             Mat? mat = null;
             try
             {
@@ -209,9 +268,9 @@ public class SkillLoopEngine
             {
                 if (mat != null) _image.ReturnMat(mat);
                 Log($"截屏异常: {ex.Message}", 2);
-                Thread.Sleep(100);
+                Thread.Sleep(EngineConst.PauseCheckIntervalMs);
             }
-            Thread.Sleep(10);
+            Thread.Sleep(EngineConst.CaptureIntervalMs);
         }
     }
 
@@ -223,29 +282,45 @@ public class SkillLoopEngine
             Mat? currentFrame = null;
             try
             {
-                if (_isPaused) { Thread.Sleep(100); continue; }
-                if (!_imageQueue.TryTake(out currentFrame, 200, token)) continue;
+                bool isPaused;
+                lock (_stateLock) { isPaused = _isPaused; }
+                
+                if (isPaused) { Thread.Sleep(EngineConst.PauseCheckIntervalMs); continue; }
+                if (!_imageQueue.TryTake(out currentFrame, EngineConst.ImageQueueTimeoutMs, token)) continue;
                 
                 if (IsFrameUnchanged(currentFrame))
                 {
                     _unchangedFrameCount++;
-                    if (_unchangedFrameCount > 10) Thread.Sleep(_adaptiveDelay.CurrentDelay * 2);
+                    if (_unchangedFrameCount > EngineConst.UnchangedFrameThreshold) Thread.Sleep(_adaptiveDelay.CurrentDelay * 2);
                     continue;
                 }
                 _unchangedFrameCount = 0;
                 _perfMonitor.StartOperation();
                 var gameState = _stateDetector.DetectGameState();
-                if (gameState.IsCasting) { Log("检测到读条中，等待...", 0); Thread.Sleep(50); continue; }
+                if (gameState.IsCasting) { Log("检测到读条中，等待...", 0); Thread.Sleep(DetectionConst.CastDetectionIntervalMs); continue; }
                 
-                _stateDetector.UpdateSkillStatesParallel(_skillStates);
+                // 使用读锁保护技能状态访问
+                _skillStatesLock.EnterReadLock();
+                try
+                {
+                    _stateDetector.UpdateSkillStatesParallel(_skillStates);
+                    
+                    // Requirements 5.1: 检测技能视觉状态变化，更新 CooldownTracker
+                    UpdateSkillReadyStates();
+                    
+                    var success = ExecuteSkillCycle(gameState);
+                    _perfMonitor.EndOperation(success);
+                }
+                finally
+                {
+                    _skillStatesLock.ExitReadLock();
+                }
                 
-                var success = ExecuteSkillCycle(gameState);
-                _perfMonitor.EndOperation(success);
                 loopCount++;
-                if (loopCount % 10 == 0) _adaptiveDelay.IsCombatMode = _stateDetector.DetectCombatState();
-                if (loopCount % 50 == 0 && _memMonitor.AutoCleanupIfNeeded(150)) Log("内存清理完成", 0);
+                if (loopCount % EngineConst.CombatDetectionInterval == 0) _adaptiveDelay.IsCombatMode = _stateDetector.DetectCombatState();
+                if (loopCount % EngineConst.MemoryCleanupInterval == 0 && _memMonitor.AutoCleanupIfNeeded(DetectionConst.MemoryCleanupThresholdMb)) Log("内存清理完成", 0);
                 
-                if (loopCount % 100 == 0 && _image is Infrastructure.OpenCvImageInterface ocv)
+                if (loopCount % EngineConst.WindowPositionUpdateInterval == 0 && _image is Infrastructure.OpenCvImageInterface ocv)
                     ocv.UpdateWindowPosition();
                 
                 var metrics = _perfMonitor.GetMetrics();
@@ -258,7 +333,7 @@ public class SkillLoopEngine
             catch (Exception ex)
             {
                 Log($"循环异常: {ex.Message} | {ex.StackTrace?.Split('\n').FirstOrDefault()}", 3);
-                Thread.Sleep(1000);
+                Thread.Sleep(EngineConst.ErrorRecoveryDelayMs);
             }
             finally
             {
@@ -267,10 +342,24 @@ public class SkillLoopEngine
         }
     }
 
+    /// <summary>
+    /// 检测帧是否未发生变化
+    /// 通过采样像素值的总和变化来判断帧是否有变化
+    /// </summary>
+    /// <param name="frame">当前帧</param>
+    /// <returns>true 表示帧未变化，false 表示帧已变化或检测被禁用</returns>
     private bool IsFrameUnchanged(Mat frame)
     {
         try
         {
+            // Requirements 8.1, 8.2: 从配置读取阈值，阈值为0时禁用检测
+            var configThreshold = _config.AppSettings.FrameChangeThreshold;
+            if (configThreshold <= 0)
+            {
+                // 阈值为0或负数时禁用帧变化检测，始终返回false表示帧已变化
+                return false;
+            }
+            
             int sum = 0;
             int width = frame.Width;
             int height = frame.Height;
@@ -281,10 +370,10 @@ public class SkillLoopEngine
                 var ptr = (byte*)frame.DataPointer;
                 int stride = (int)frame.Step();
                 
-                for (int y = 0; y < height; y += SampleStride)
+                for (int y = 0; y < height; y += EngineConst.FrameSampleStride)
                 {
                     var row = ptr + y * stride;
-                    for (int x = 0; x < width; x += SampleStride)
+                    for (int x = 0; x < width; x += EngineConst.FrameSampleStride)
                     {
                         int offset = x * channels;
                         sum += row[offset] + row[offset + 1] + row[offset + 2];
@@ -295,8 +384,9 @@ public class SkillLoopEngine
             int diff = Math.Abs(sum - _lastSampleSum);
             _lastSampleSum = sum;
             
-            int sampleCount = (width / SampleStride) * (height / SampleStride);
-            int threshold = sampleCount * 15;
+            int sampleCount = (width / EngineConst.FrameSampleStride) * (height / EngineConst.FrameSampleStride);
+            // 使用配置的阈值替代硬编码的15
+            int threshold = sampleCount * configThreshold;
             
             return diff < threshold;
         }
@@ -315,7 +405,8 @@ public class SkillLoopEngine
         { 
             SkillStates = _skillStates, 
             GameState = gameState, 
-            LoopMode = _config.AppSettings.EnableSmartMode ? "Smart" : "Default" 
+            LoopMode = _config.AppSettings.EnableSmartMode ? "Smart" : "Default",
+            Settings = _config.AppSettings
         };
         
         SkillRuntimeState? skill = null;
@@ -327,7 +418,18 @@ public class SkillLoopEngine
         
         if (skill == null) return true;
 
-        // 检查Buff条件
+        // Requirements 5.1, 5.2, 5.3: 前置技能链逻辑（通过技能名称引用）
+        if (!string.IsNullOrEmpty(skill.Config.PreCastSkillName))
+        {
+            var preCastResult = ExecutePreCastSkillChain(skill);
+            if (!preCastResult)
+            {
+                // Requirements 5.3: 前置技能释放失败，本周期跳过主技能
+                return true;
+            }
+        }
+
+        // 检查Buff条件（旧的PreCastKeyCode逻辑，保持向后兼容）
         var buffSatisfied = CheckBuffCondition(skill.Config);
         
         if (!buffSatisfied && skill.Config.PreCastKeyCode > 0)
@@ -338,6 +440,8 @@ public class SkillLoopEngine
                 Log("前置技能释放失败", 2); 
                 return false; 
             }
+            
+            // 等待前置技能施法时间
             Thread.Sleep(skill.Config.ComboDelay);
             
             var newState = _stateDetector.DetectGameState();
@@ -347,13 +451,34 @@ public class SkillLoopEngine
                 return true; 
             }
             
-            buffSatisfied = CheckBuffCondition(skill.Config);
+            // 使用配置的重试参数检查Buff
+            // Requirements 4.1, 4.3: 前置技能释放后重试检查Buff
+            var buffCheckDelay = skill.Config.BuffCheckDelay;
+            var buffCheckRetries = skill.Config.BuffCheckRetries;
+            
+            for (int retry = 0; retry < buffCheckRetries; retry++)
+            {
+                // 等待Buff生效
+                Thread.Sleep(buffCheckDelay);
+                
+                buffSatisfied = CheckBuffCondition(skill.Config);
+                if (buffSatisfied)
+                {
+                    Log($"Buff [{skill.Config.PreCastConditionBuff}] 已获得 (重试 {retry + 1}/{buffCheckRetries})", 0);
+                    break;
+                }
+                
+                if (retry < buffCheckRetries - 1)
+                {
+                    Log($"Buff [{skill.Config.PreCastConditionBuff}] 检查失败，重试 {retry + 2}/{buffCheckRetries}", 0);
+                }
+            }
+            
             if (!buffSatisfied) 
             { 
-                Log($"Buff [{skill.Config.PreCastConditionBuff}] 未获得，等待下次循环", 1); 
+                Log($"Buff [{skill.Config.PreCastConditionBuff}] 未获得 (已重试 {buffCheckRetries} 次)，等待下次循环", 1); 
                 return true; 
             }
-            Log($"Buff [{skill.Config.PreCastConditionBuff}] 已获得", 0);
         }
         else if (!buffSatisfied && skill.Config.PreCastKeyCode <= 0) 
         { 
@@ -362,6 +487,111 @@ public class SkillLoopEngine
         }
         
         return ExecuteSkill(skill);
+    }
+    
+    /// <summary>
+    /// 执行前置技能链
+    /// Requirements 5.1: 当技能配置了PreCastSkillName时，首先尝试释放前置技能
+    /// Requirements 5.2: 前置技能成功释放后，等待ComboDelay后再释放主技能
+    /// Requirements 5.3: 前置技能释放失败时，本周期跳过主技能
+    /// </summary>
+    /// <param name="mainSkill">主技能</param>
+    /// <returns>true表示前置技能链执行成功，可以继续释放主技能；false表示失败，应跳过主技能</returns>
+    private bool ExecutePreCastSkillChain(SkillRuntimeState mainSkill)
+    {
+        var preCastSkillName = mainSkill.Config.PreCastSkillName;
+        
+        // 通过技能名称查找前置技能
+        var preCastSkill = FindSkillByName(preCastSkillName);
+        if (preCastSkill == null)
+        {
+            // 错误处理：无效技能引用，跳过前置技能直接释放主技能
+            Log($"前置技能 [{preCastSkillName}] 未找到，跳过前置技能", 1);
+            return true;
+        }
+        
+        // 检测循环引用
+        if (HasCircularReference(mainSkill.Config.Name, preCastSkillName, new HashSet<string>()))
+        {
+            Log($"检测到前置技能链循环引用: {mainSkill.Config.Name} -> {preCastSkillName}，跳过前置技能", 2);
+            return true;
+        }
+        
+        Log($"前置技能链: {mainSkill.Config.Name} 需要先释放 {preCastSkillName}", 0);
+        
+        // Requirements 5.1: 尝试释放前置技能
+        var preCastSuccess = ExecuteSkill(preCastSkill);
+        
+        if (!preCastSuccess)
+        {
+            // Requirements 5.3: 前置技能释放失败，本周期跳过主技能
+            Log($"前置技能 [{preCastSkillName}] 释放失败，跳过主技能 [{mainSkill.Config.Name}]", 1);
+            return false;
+        }
+        
+        // Requirements 5.2: 等待ComboDelay后再释放主技能
+        var comboDelay = mainSkill.Config.ComboDelay;
+        if (comboDelay > 0)
+        {
+            Log($"前置技能 [{preCastSkillName}] 释放成功，等待 {comboDelay}ms 后释放主技能", 0);
+            Thread.Sleep(comboDelay);
+        }
+        
+        // 检查是否在读条中
+        var newState = _stateDetector.DetectGameState();
+        if (newState.IsCasting)
+        {
+            Log("前置技能读条中，等待完成...", 0);
+            return false; // 本周期跳过主技能，等待下次循环
+        }
+        
+        return true;
+    }
+    
+    /// <summary>
+    /// 通过技能名称查找技能
+    /// </summary>
+    /// <param name="skillName">技能名称</param>
+    /// <returns>找到的技能运行时状态，未找到返回null</returns>
+    private SkillRuntimeState? FindSkillByName(string skillName)
+    {
+        if (string.IsNullOrEmpty(skillName))
+            return null;
+        
+        return _skillStates.FirstOrDefault(s => 
+            s.Config.Name.Equals(skillName, StringComparison.OrdinalIgnoreCase));
+    }
+    
+    /// <summary>
+    /// 检测前置技能链是否存在循环引用
+    /// </summary>
+    /// <param name="currentSkillName">当前技能名称</param>
+    /// <param name="preCastSkillName">前置技能名称</param>
+    /// <param name="visited">已访问的技能名称集合</param>
+    /// <returns>true表示存在循环引用</returns>
+    private bool HasCircularReference(string currentSkillName, string preCastSkillName, HashSet<string> visited)
+    {
+        if (string.IsNullOrEmpty(preCastSkillName))
+            return false;
+        
+        // 如果前置技能指向当前技能，存在循环
+        if (preCastSkillName.Equals(currentSkillName, StringComparison.OrdinalIgnoreCase))
+            return true;
+        
+        // 如果前置技能已经访问过，存在循环
+        if (visited.Contains(preCastSkillName))
+            return true;
+        
+        visited.Add(preCastSkillName);
+        
+        // 递归检查前置技能的前置技能
+        var preCastSkill = FindSkillByName(preCastSkillName);
+        if (preCastSkill != null && !string.IsNullOrEmpty(preCastSkill.Config.PreCastSkillName))
+        {
+            return HasCircularReference(currentSkillName, preCastSkill.Config.PreCastSkillName, visited);
+        }
+        
+        return false;
     }
 
     /// <summary>
@@ -377,10 +607,10 @@ public class SkillLoopEngine
 
     private bool ExecuteSkill(SkillRuntimeState skill)
     {
-        if (skill.ConsecutiveFailures >= 5)
+        if (skill.ConsecutiveFailures >= EngineConst.MaxConsecutiveFailures)
         {
-            Log($"技能 {skill.Config.Name} 连续失败5次，触发ESC重置", 2);
-            _keyboard.PressAndRelease(27);
+            Log($"技能 {skill.Config.Name} 连续失败{EngineConst.MaxConsecutiveFailures}次，触发ESC重置", 2);
+            _keyboard.PressAndRelease(VK.Escape);
             skill.ConsecutiveFailures = 0;
             return false;
         }
@@ -417,6 +647,8 @@ public class SkillLoopEngine
             skill.MarkAsUsed();
             skill.ConsecutiveFailures = 0;
             _cooldownTracker.RecordSkillUse(skill.Config.Name, skill.Config.Cooldown);
+            // Requirements 6.1, 6.2, 6.3: 技能成功释放后更新状态追踪器
+            UpdateStateOnSkillCast(skill.Config);
             Log($"释放: {skill.Config.Name} [瞬发]", 0);
             return true;
         }
@@ -437,6 +669,8 @@ public class SkillLoopEngine
             skill.MarkAsUsed();
             skill.ConsecutiveFailures = 0;
             _cooldownTracker.RecordSkillUse(config.Name, config.Cooldown);
+            // Requirements 6.1, 6.2, 6.3: 技能成功释放后更新状态追踪器
+            UpdateStateOnSkillCast(config);
             
             var maxCastTime = config.CastDuration;
             
@@ -469,9 +703,9 @@ public class SkillLoopEngine
     /// </summary>
     private void WaitForCastEnd(SkillConfig config, int maxWaitTime)
     {
-        var checkInterval = 50;
+        var checkInterval = DetectionConst.CastDetectionIntervalMs;
         var elapsed = 0;
-        var maxTime = maxWaitTime > 0 ? maxWaitTime : 10000;
+        var maxTime = maxWaitTime > 0 ? maxWaitTime : DetectionConst.MaxChannelDurationMs;
         
         while (elapsed < maxTime)
         {
@@ -534,49 +768,78 @@ public class SkillLoopEngine
     
     /// <summary>
     /// 执行引导技能
+    /// 使用 try-finally 确保按键始终被释放，即使发生异常或中断
     /// </summary>
     private bool ExecuteChanneledSkill(SkillRuntimeState skill)
     {
         var config = skill.Config;
         
         // 引导技能需要按住，这里用 PressKey + Sleep + ReleaseKey 模拟
-        if (_keyboard.PressKey(config.KeyCode))
+        if (!_keyboard.PressKey(config.KeyCode))
+        {
+            skill.ConsecutiveFailures++;
+            return false;
+        }
+        
+        try
         {
             skill.MarkAsUsed();
             skill.ConsecutiveFailures = 0;
             _cooldownTracker.RecordSkillUse(config.Name, config.Cooldown);
+            // Requirements 6.1, 6.2, 6.3: 技能成功释放后更新状态追踪器
+            UpdateStateOnSkillCast(config);
             
-            // 根据打断模式执行不同逻辑
-            if (config.ChannelInterruptMode == 1 && config.ChannelInterruptPoint.Any(v => v > 0))
-            {
-                // 点色检测打断模式
-                ExecuteColorDetectChannel(config);
-            }
-            else if (config.ChannelInterruptTime > 0)
-            {
-                // 固定时间打断模式
-                ExecuteFixedTimeChannel(config);
-            }
-            else if (config.UseCastEndDetection)
-            {
-                // 使用视觉检测判断引导结束
-                Log($"释放: {config.Name} [引导, 视觉检测结束]", 0);
-                WaitForCastEnd(config, config.CastDuration);
-            }
-            else
-            {
-                // 完整引导
-                ExecuteFixedTimeChannel(config);
-            }
-            
-            // 释放按键（打断引导或自然结束）
-            _keyboard.ReleaseKey(config.KeyCode);
+            // 执行引导逻辑
+            ExecuteChannelLogic(config);
             
             return true;
         }
-        
-        skill.ConsecutiveFailures++;
-        return false;
+        catch (Exception ex)
+        {
+            Log($"引导技能 {config.Name} 执行异常: {ex.Message}", 2);
+            return false;
+        }
+        finally
+        {
+            // 确保按键始终被释放，无论正常完成、异常还是中断
+            if (!_keyboard.ReleaseKey(config.KeyCode))
+            {
+                Log($"引导技能 {config.Name} 按键释放失败，尝试恢复", 2);
+                // 尝试再次释放
+                Thread.Sleep(10);
+                _keyboard.ReleaseKey(config.KeyCode);
+            }
+        }
+    }
+    
+    /// <summary>
+    /// 执行引导逻辑（从 ExecuteChanneledSkill 提取）
+    /// 根据配置选择不同的引导模式
+    /// </summary>
+    private void ExecuteChannelLogic(SkillConfig config)
+    {
+        // 根据打断模式执行不同逻辑
+        if (config.ChannelInterruptMode == 1 && config.ChannelInterruptPoint.Any(v => v > 0))
+        {
+            // 点色检测打断模式
+            ExecuteColorDetectChannel(config);
+        }
+        else if (config.ChannelInterruptTime > 0)
+        {
+            // 固定时间打断模式
+            ExecuteFixedTimeChannel(config);
+        }
+        else if (config.UseCastEndDetection)
+        {
+            // 使用视觉检测判断引导结束
+            Log($"释放: {config.Name} [引导, 视觉检测结束]", 0);
+            WaitForCastEnd(config, config.CastDuration);
+        }
+        else
+        {
+            // 完整引导
+            ExecuteFixedTimeChannel(config);
+        }
     }
     
     /// <summary>
@@ -608,8 +871,8 @@ public class SkillLoopEngine
     /// </summary>
     private void ExecuteColorDetectChannel(SkillConfig config)
     {
-        var maxTime = config.CastDuration > 0 ? config.CastDuration : 10000; // 最大10秒
-        var checkInterval = 50; // 每50ms检测一次
+        var maxTime = config.CastDuration > 0 ? config.CastDuration : DetectionConst.MaxChannelDurationMs;
+        var checkInterval = DetectionConst.CastDetectionIntervalMs;
         var elapsed = 0;
         
         var targetColor = config.ChannelInterruptColor;
@@ -679,7 +942,56 @@ public class SkillLoopEngine
     }
 
     public SkillCooldownTracker CooldownTracker => _cooldownTracker;
+    
+    /// <summary>
+    /// 状态追踪器，用于跨周期追踪命名的布尔状态
+    /// Requirements 6.1: 技能引擎维护StateTracker字典用于存储命名的布尔状态
+    /// </summary>
+    public StateTracker StateTracker => _stateTracker;
+    
     public SkillStatistics GetSkillStatistics(string skillName) => _cooldownTracker.GetStatistics(skillName);
+    
+    /// <summary>
+    /// 技能成功释放后更新状态追踪器
+    /// Requirements 6.2: 当技能配置了SetStateOnCast时，将指定状态设为true
+    /// Requirements 6.3: 当技能配置了ClearStateOnCast时，将指定状态设为false
+    /// </summary>
+    /// <param name="config">技能配置</param>
+    private void UpdateStateOnSkillCast(SkillConfig config)
+    {
+        // Requirements 6.2: SetStateOnCast - 将指定状态设为true
+        if (!string.IsNullOrEmpty(config.SetStateOnCast))
+        {
+            _stateTracker.SetState(config.SetStateOnCast, true);
+            Log($"状态追踪: 设置 [{config.SetStateOnCast}] = true", 0);
+        }
+        
+        // Requirements 6.3: ClearStateOnCast - 将指定状态设为false
+        if (!string.IsNullOrEmpty(config.ClearStateOnCast))
+        {
+            _stateTracker.SetState(config.ClearStateOnCast, false);
+            Log($"状态追踪: 设置 [{config.ClearStateOnCast}] = false", 0);
+        }
+    }
+    
+    /// <summary>
+    /// 更新技能就绪状态，检测视觉状态变化
+    /// Requirements 5.1: 当技能从 IsVisuallyReady=false 变为 true 时，调用 RecordSkillReady
+    /// </summary>
+    private void UpdateSkillReadyStates()
+    {
+        foreach (var skill in _skillStates)
+        {
+            // 检测 IsVisuallyReady 从 false 变为 true
+            if (skill.IsVisuallyReady && !skill.WasVisuallyReady)
+            {
+                _cooldownTracker.RecordSkillReady(skill.Config.Name);
+                Log($"技能 {skill.Config.Name} 视觉就绪，更新冷却追踪", 0);
+            }
+            // 更新上一次的视觉状态
+            skill.WasVisuallyReady = skill.IsVisuallyReady;
+        }
+    }
     
     private void Log(string msg, int level) 
     { 

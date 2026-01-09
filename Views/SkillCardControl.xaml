@@ -356,6 +356,103 @@
                         </StackPanel>
                     </Grid>
                     
+                    <!-- 高级条件配置 -->
+                    <TextBlock Text="高级条件配置" FontWeight="SemiBold" Margin="0,8,0,8" Foreground="#CCC"/>
+                    
+                    <!-- 条件Buff -->
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Margin="0,0,8,0">
+                            <TextBlock Text="条件Buff (释放前置条件)" FontSize="12" Foreground="#999" Margin="0,0,0,4"/>
+                            <ComboBox x:Name="ConditionBuffComboBox" 
+                                      Text="{Binding ConditionBuff, Mode=TwoWay}" 
+                                      IsEditable="True"
+                                      ToolTip="只有当此Buff存在时才能释放该技能"
+                                      SelectionChanged="ConditionBuffComboBox_SelectionChanged"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                            <TextBlock Text="技能组" FontSize="12" Foreground="#999" Margin="0,0,0,4"/>
+                            <ComboBox x:Name="SkillGroupComboBox" 
+                                      Text="{Binding SkillGroup, Mode=TwoWay}" 
+                                      IsEditable="True"
+                                      ToolTip="属于同一技能组的技能共享组级别的条件"
+                                      SelectionChanged="SkillGroupComboBox_SelectionChanged"/>
+                        </StackPanel>
+                    </Grid>
+                    
+                    <!-- 优先级覆盖配置 -->
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Margin="0,0,8,0">
+                            <TextBlock Text="优先级覆盖条件Buff" FontSize="12" Foreground="#999" Margin="0,0,0,4"/>
+                            <ComboBox x:Name="PriorityOverrideConditionComboBox" 
+                                      Text="{Binding PriorityOverrideCondition, Mode=TwoWay}" 
+                                      IsEditable="True"
+                                      ToolTip="当此Buff存在时，使用覆盖优先级"
+                                      SelectionChanged="PriorityOverrideConditionComboBox_SelectionChanged"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                            <TextBlock Text="覆盖优先级值" FontSize="12" Foreground="#999" Margin="0,0,0,4"/>
+                            <ui:TextBox Text="{Binding PriorityOverrideValue}" 
+                                        ToolTip="当覆盖条件满足时使用的优先级值"
+                                        TextChanged="OnConfigChanged"/>
+                        </StackPanel>
+                    </Grid>
+                    
+                    <!-- MP优先级加成配置 -->
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Margin="0,0,8,0">
+                            <TextBlock Text="MP优先级加成" FontSize="12" Foreground="#999" Margin="0,0,0,4"/>
+                            <ui:TextBox Text="{Binding MpPriorityBoost}" 
+                                        ToolTip="当MP高于阈值时，将此值加到有效优先级上"
+                                        TextChanged="OnConfigChanged"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                            <TextBlock Text="MP加成阈值(%)" FontSize="12" Foreground="#999" Margin="0,0,0,4"/>
+                            <ui:TextBox Text="{Binding MpThresholdForBoost}" 
+                                        ToolTip="当MP高于此百分比时，应用MP优先级加成"
+                                        TextChanged="OnConfigChanged"/>
+                        </StackPanel>
+                    </Grid>
+                    
+                    <!-- 状态追踪配置 -->
+                    <TextBlock Text="状态追踪配置" FontWeight="SemiBold" Margin="0,8,0,8" Foreground="#CCC"/>
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Margin="0,0,8,0">
+                            <TextBlock Text="要求状态" FontSize="12" Foreground="#999" Margin="0,0,0,4"/>
+                            <ui:TextBox Text="{Binding RequireState, UpdateSourceTrigger=PropertyChanged}" 
+                                        ToolTip="只有当指定状态为true时才能选择此技能"
+                                        TextChanged="OnConfigChanged"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                            <TextBlock Text="施法后设置状态" FontSize="12" Foreground="#999" Margin="0,0,0,4"/>
+                            <ui:TextBox Text="{Binding SetStateOnCast, UpdateSourceTrigger=PropertyChanged}" 
+                                        ToolTip="技能成功释放后，将指定状态设为true"
+                                        TextChanged="OnConfigChanged"/>
+                        </StackPanel>
+                    </Grid>
+                    <StackPanel Margin="0,0,0,8">
+                        <TextBlock Text="施法后清除状态" FontSize="12" Foreground="#999" Margin="0,0,0,4"/>
+                        <ui:TextBox Text="{Binding ClearStateOnCast, UpdateSourceTrigger=PropertyChanged}" 
+                                    Width="200" HorizontalAlignment="Left"
+                                    ToolTip="技能成功释放后，将指定状态设为false"
+                                    TextChanged="OnConfigChanged"/>
+                    </StackPanel>
+                    
                     <!-- 连招配置 -->
                     <TextBlock Text="连招配置 (可选)" FontWeight="SemiBold" Margin="0,8,0,8" Foreground="#CCC"/>
                     <Grid Margin="0,0,0,8">
@@ -364,13 +461,28 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <StackPanel Margin="0,0,8,0">
+                            <TextBlock Text="前置技能名称" FontSize="12" Foreground="#999" Margin="0,0,0,4"/>
+                            <ComboBox x:Name="PreCastSkillNameComboBox" 
+                                      Text="{Binding PreCastSkillName, Mode=TwoWay}" 
+                                      IsEditable="True"
+                                      ToolTip="释放此技能前，先释放指定名称的前置技能"
+                                      SelectionChanged="PreCastSkillNameComboBox_SelectionChanged"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Margin="8,0,0,0">
                             <TextBlock Text="触发条件Buff" FontSize="12" Foreground="#999" Margin="0,0,0,4"/>
                             <ComboBox x:Name="BuffComboBox" 
                                       Text="{Binding PreCastConditionBuff, Mode=TwoWay}" 
                                       IsEditable="True"
                                       SelectionChanged="BuffComboBox_SelectionChanged"/>
                         </StackPanel>
-                        <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                    </Grid>
+                    
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Margin="0,0,8,0">
                             <TextBlock Text="前置技能按键" FontSize="12" Foreground="#999" Margin="0,0,0,4"/>
                             <StackPanel Orientation="Horizontal">
                                 <Border Background="#333" CornerRadius="4" Padding="12,6" MinWidth="50">
@@ -379,12 +491,11 @@
                                 <ui:Button Content="设置" Height="32" Margin="8,0,0,0" Tag="CapturePreCastKey" Click="ActionButton_Click"/>
                             </StackPanel>
                         </StackPanel>
+                        <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                            <TextBlock Text="连招延迟(毫秒)" FontSize="12" Foreground="#999" Margin="0,0,0,4"/>
+                            <ui:TextBox Text="{Binding ComboDelay}" TextChanged="OnConfigChanged"/>
+                        </StackPanel>
                     </Grid>
-                    
-                    <StackPanel Margin="0,0,0,8">
-                        <TextBlock Text="连招延迟(毫秒)" FontSize="12" Foreground="#999" Margin="0,0,0,4"/>
-                        <ui:TextBox Text="{Binding ComboDelay}" Width="150" HorizontalAlignment="Left" TextChanged="OnConfigChanged"/>
-                    </StackPanel>
                 </StackPanel>
             </Border>
         </StackPanel>

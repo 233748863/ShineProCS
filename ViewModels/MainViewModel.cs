@@ -1603,4 +1603,35 @@ public partial class MainViewModel : ObservableObject, IDisposable
         OnLog($"已删除方案: {deletedName}", 1);
         ToastManager.Info($"方案 '{deletedName}' 已删除");
     }
+    
+    /// <summary>
+    /// 添加技能组
+    /// </summary>
+    [RelayCommand]
+    private void AddSkillGroup()
+    {
+        var newGroup = new SkillGroupConfig
+        {
+            Name = $"技能组{AppSettings.SkillGroups.Count + 1}",
+            ConditionBuff = "",
+            Enabled = true
+        };
+        AppSettings.SkillGroups.Add(newGroup);
+        OnLog($"已添加技能组: {newGroup.Name}", 1);
+        ToastManager.Success($"已添加技能组: {newGroup.Name}", "技能组");
+    }
+    
+    /// <summary>
+    /// 删除技能组
+    /// </summary>
+    [RelayCommand]
+    private void RemoveSkillGroup(SkillGroupConfig? group)
+    {
+        if (group == null) return;
+        
+        var groupName = group.Name;
+        AppSettings.SkillGroups.Remove(group);
+        OnLog($"已删除技能组: {groupName}", 1);
+        ToastManager.Info($"已删除技能组: {groupName}", "技能组");
+    }
 }

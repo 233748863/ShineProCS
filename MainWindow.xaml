@@ -371,6 +371,59 @@
                                 </StackPanel>
                             </ui:Card>
                             
+                            <!-- 技能组配置 -->
+                            <ui:Card Margin="0,0,0,16">
+                                <StackPanel>
+                                    <DockPanel Margin="0,0,0,12">
+                                        <TextBlock Text="技能组配置" FontSize="16" FontWeight="SemiBold"/>
+                                        <ui:Button Content="+ 添加" Height="28" HorizontalAlignment="Right" Command="{Binding AddSkillGroupCommand}"/>
+                                    </DockPanel>
+                                    <TextBlock Text="技能组用于定义一组相关联的技能，共享组级别的条件。当组条件不满足时，组内所有技能都会被跳过。" Foreground="#888" FontSize="12" Margin="0,0,0,12" TextWrapping="Wrap"/>
+                                    
+                                    <!-- 技能组列表 -->
+                                    <ItemsControl ItemsSource="{Binding AppSettings.SkillGroups}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Background="#252525" CornerRadius="6" Padding="12" Margin="0,0,0,8">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <StackPanel Margin="0,0,8,0">
+                                                            <TextBlock Text="组名称" FontSize="11" Foreground="#999" Margin="0,0,0,2"/>
+                                                            <ui:TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="输入组名称"/>
+                                                        </StackPanel>
+                                                        <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                                                            <TextBlock Text="条件Buff" FontSize="11" Foreground="#999" Margin="0,0,0,2"/>
+                                                            <ui:TextBox Text="{Binding ConditionBuff, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Buff名称"/>
+                                                        </StackPanel>
+                                                        <CheckBox Grid.Column="2" IsChecked="{Binding Enabled}" Content="启用" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                                                        <ui:Button Grid.Column="3" Content="×" Width="28" Height="28" Margin="8,0,0,0" VerticalAlignment="Center" ToolTip="删除" Command="{Binding DataContext.RemoveSkillGroupCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}"/>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    
+                                    <!-- 空状态提示 -->
+                                    <TextBlock Text="暂无技能组，点击「+ 添加」创建" Foreground="#666" FontSize="12" HorizontalAlignment="Center" Margin="0,8,0,0">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding AppSettings.SkillGroups.Count}" Value="0">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </StackPanel>
+                            </ui:Card>
+                            
                             <!-- 全局快捷键设置 -->
                             <ui:Card Margin="0,0,0,16">
                                 <StackPanel>

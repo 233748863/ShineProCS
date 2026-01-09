@@ -1,24 +1,53 @@
-using System.Collections.Concurrent;
 using System.IO;
 using ShineProCS.Core.Interfaces;
 using ShineProCS.Models;
 using OpenCvSharp;
 
+using DetectionConst = ShineProCS.Core.Constants.Detection;
+
 namespace ShineProCS.Core.Services;
 
-public class StateDetector
+/// <summary>
+/// 游戏状态检测器
+/// 负责检测HP/MP、技能状态、Buff状态等
+/// </summary>
+public class StateDetector : IDisposable
 {
     private readonly IImageInterface _image;
     private readonly ConfigManager _config;
-    private readonly ConcurrentDictionary<string, Mat> _templateCache = new();
+    private readonly LruTemplateCache _templateCache;
     private readonly TemplatePreloader? _preloader;
-    private const int MaxCacheSize = 50;
+    private bool _disposed;
+    
+    // HP/MP检测失败缓存字段 (Requirement 3)
+    private double _lastValidHpPercent = 100.0;
+    private double _lastValidMpPercent = 100.0;
+    private int _consecutiveHpFailures = 0;
+    private int _consecutiveMpFailures = 0;
+    private const int MaxConsecutiveFailures = 5;
 
     public StateDetector(IImageInterface image, ConfigManager config, TemplatePreloader? preloader = null)
     {
         _image = image;
         _config = config;
         _preloader = preloader;
+        
+        // 从配置读取缓存大小，使用 LRU 缓存策略
+        var cacheSize = config.AppSettings.TemplateCacheSize;
+        if (cacheSize <= 0) cacheSize = 50; // 默认值
+        _templateCache = new LruTemplateCache(cacheSize);
+    }
+    
+    /// <summary>
+    /// 释放资源
+    /// </summary>
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        
+        _templateCache.Dispose();
+        GC.SuppressFinalize(this);
     }
 
     /// <summary>
@@ -31,14 +60,16 @@ public class StateDetector
         
         if (settings.HealthBarRegion.Any(v => v > 0))
         {
-            state.CurrentHpPercent = DetectBarPercent(settings.HealthBarRegion, isHealth: true);
+            state.CurrentHpPercent = DetectBarPercent(settings.HealthBarRegion, isHealth: true, out bool isHpCached);
             state.HpPercentage = state.CurrentHpPercent / 100.0;
+            state.IsHpCached = isHpCached;
         }
         
         if (settings.ManaBarRegion.Any(v => v > 0))
         {
-            state.CurrentMpPercent = DetectBarPercent(settings.ManaBarRegion, isHealth: false);
+            state.CurrentMpPercent = DetectBarPercent(settings.ManaBarRegion, isHealth: false, out bool isMpCached);
             state.MpPercentage = state.CurrentMpPercent / 100.0;
+            state.IsMpCached = isMpCached;
         }
         
         // 检测目标HP
@@ -63,7 +94,7 @@ public class StateDetector
     {
         if (states.Count == 0) return;
         
-        if (states.Count < 3)
+        if (states.Count < DetectionConst.ParallelDetectionThreshold)
         {
             foreach (var state in states)
                 UpdateSkillState(state);
@@ -81,7 +112,7 @@ public class StateDetector
             return;
         }
 
-        Parallel.ForEach(toDetect, new ParallelOptions { MaxDegreeOfParallelism = 4 }, state =>
+        Parallel.ForEach(toDetect, new ParallelOptions { MaxDegreeOfParallelism = DetectionConst.MaxParallelDegree }, state =>
         {
             UpdateSkillState(state);
         });
@@ -90,13 +121,56 @@ public class StateDetector
             s.IsVisuallyReady = true;
     }
 
-    private double DetectBarPercent(int[] region, bool isHealth)
+    private double DetectBarPercent(int[] region, bool isHealth, out bool isCached)
     {
+        isCached = false;
+        
         if (region.Length < 4 || region[2] <= 0 || region[3] <= 0)
-            return 100.0;
+        {
+            // 记录检测失败
+            if (isHealth)
+            {
+                _consecutiveHpFailures++;
+                if (_consecutiveHpFailures >= MaxConsecutiveFailures)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[StateDetector] HP检测连续失败{_consecutiveHpFailures}次，使用缓存值: {_lastValidHpPercent}%");
+                }
+            }
+            else
+            {
+                _consecutiveMpFailures++;
+                if (_consecutiveMpFailures >= MaxConsecutiveFailures)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[StateDetector] MP检测连续失败{_consecutiveMpFailures}次，使用缓存值: {_lastValidMpPercent}%");
+                }
+            }
+            isCached = true;
+            return isHealth ? _lastValidHpPercent : _lastValidMpPercent;
+        }
         
         var frame = _image.GetScreenRegion(region[0], region[1], region[2], region[3]);
-        if (frame == null) return 100.0;
+        if (frame == null)
+        {
+            // 记录检测失败
+            if (isHealth)
+            {
+                _consecutiveHpFailures++;
+                if (_consecutiveHpFailures >= MaxConsecutiveFailures)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[StateDetector] HP检测连续失败{_consecutiveHpFailures}次，使用缓存值: {_lastValidHpPercent}%");
+                }
+            }
+            else
+            {
+                _consecutiveMpFailures++;
+                if (_consecutiveMpFailures >= MaxConsecutiveFailures)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[StateDetector] MP检测连续失败{_consecutiveMpFailures}次，使用缓存值: {_lastValidMpPercent}%");
+                }
+            }
+            isCached = true;
+            return isHealth ? _lastValidHpPercent : _lastValidMpPercent;
+        }
         
         try
         {
@@ -132,13 +206,32 @@ public class StateDetector
             var nonZero = Cv2.CountNonZero(mask);
             var total = frame.Width * frame.Height;
             var percent = (double)nonZero / total * 100.0;
+            var result = Math.Min(100.0, Math.Max(0.0, percent));
             
-            return Math.Min(100.0, Math.Max(0.0, percent));
+            // 检测成功，更新缓存
+            if (isHealth)
+            {
+                _lastValidHpPercent = result;
+                _consecutiveHpFailures = 0;
+            }
+            else
+            {
+                _lastValidMpPercent = result;
+                _consecutiveMpFailures = 0;
+            }
+            
+            return result;
         }
         finally
         {
             _image.ReturnMat(frame);
         }
+    }
+    
+    // 保留旧签名以兼容其他调用
+    private double DetectBarPercent(int[] region, bool isHealth)
+    {
+        return DetectBarPercent(region, isHealth, out _);
     }
 
     private bool DetectGlobalCd(int[] point)
@@ -149,34 +242,62 @@ public class StateDetector
         if (color == null) return false;
         
         var settings = _config.AppSettings;
-        var r = color.Value.r;
-        var g = color.Value.g;
-        var b = color.Value.b;
+        var mode = (GcdDetectionMode)settings.GlobalCdDetectionMode;
         
-        // 优先使用点色检测：检测点颜色匹配公共CD颜色时，表示正在CD中
-        if (settings.GlobalCdColor.Length >= 3 && settings.GlobalCdColor.Any(v => v > 0))
+        // Auto模式：有颜色配置用颜色，否则用亮度
+        if (mode == GcdDetectionMode.Auto)
         {
-            var targetR = settings.GlobalCdColor[0];
-            var targetG = settings.GlobalCdColor[1];
-            var targetB = settings.GlobalCdColor[2];
-            var tolerance = settings.GlobalCdColorTolerance;
-            
-            // 颜色匹配 = 正在公共CD中
-            if (Math.Abs(r - targetR) <= tolerance &&
-                Math.Abs(g - targetG) <= tolerance &&
-                Math.Abs(b - targetB) <= tolerance)
-            {
-                return true;
-            }
-            return false;
+            mode = settings.GlobalCdColor.Length >= 3 && settings.GlobalCdColor.Any(v => v > 0)
+                ? GcdDetectionMode.Color
+                : GcdDetectionMode.Brightness;
         }
         
-        // 兼容旧逻辑：亮度检测
-        var brightness = (r + g + b) / 3.0;
+        return mode switch
+        {
+            GcdDetectionMode.Color => DetectGcdByColor(color.Value, settings),
+            GcdDetectionMode.Brightness => DetectGcdByBrightness(color.Value, settings),
+            _ => false
+        };
+    }
+    
+    /// <summary>
+    /// 使用颜色匹配检测公共CD
+    /// </summary>
+    /// <param name="color">检测点的颜色</param>
+    /// <param name="settings">应用设置</param>
+    /// <returns>是否正在公共CD中</returns>
+    private static bool DetectGcdByColor((byte r, byte g, byte b) color, AppSettings settings)
+    {
+        if (settings.GlobalCdColor.Length < 3)
+            return false;
+        
+        var targetR = settings.GlobalCdColor[0];
+        var targetG = settings.GlobalCdColor[1];
+        var targetB = settings.GlobalCdColor[2];
+        var tolerance = settings.GlobalCdColorTolerance;
+        
+        // 颜色匹配 = 正在公共CD中
+        return Math.Abs(color.r - targetR) <= tolerance &&
+               Math.Abs(color.g - targetG) <= tolerance &&
+               Math.Abs(color.b - targetB) <= tolerance;
+    }
+    
+    /// <summary>
+    /// 使用亮度检测公共CD
+    /// </summary>
+    /// <param name="color">检测点的颜色</param>
+    /// <param name="settings">应用设置</param>
+    /// <returns>是否正在公共CD中</returns>
+    private static bool DetectGcdByBrightness((byte r, byte g, byte b) color, AppSettings settings)
+    {
+        var brightness = (color.r + color.g + color.b) / 3.0;
+        
+        // 亮度超过阈值 = 正在公共CD中
         if (brightness > settings.GlobalCdBrightnessThreshold)
             return true;
         
-        if (r > 150 && g > 150 && b < 100)
+        // 兼容旧逻辑：黄色检测（某些游戏的GCD指示器）
+        if (color.r > 150 && color.g > 150 && color.b < 100)
             return true;
         
         return false;
@@ -322,13 +443,16 @@ public class StateDetector
     {
         if (string.IsNullOrEmpty(path)) return null;
         
+        // 优先从预加载器获取
         if (_preloader != null)
         {
             var preloaded = _preloader.GetTemplate(path);
             if (preloaded != null) return preloaded;
         }
         
-        if (_templateCache.TryGetValue(path, out var cached))
+        // 从 LRU 缓存获取
+        var cached = _templateCache.Get(path);
+        if (cached != null)
             return cached;
         
         if (!File.Exists(path)) return null;
@@ -338,17 +462,8 @@ public class StateDetector
             var template = Cv2.ImRead(path, ImreadModes.Color);
             if (!template.Empty())
             {
-                if (_templateCache.Count >= MaxCacheSize)
-                {
-                    var keysToRemove = _templateCache.Keys.Take(_templateCache.Count / 2).ToList();
-                    foreach (var key in keysToRemove)
-                    {
-                        if (_templateCache.TryRemove(key, out var mat))
-                            mat.Dispose();
-                    }
-                }
-                
-                _templateCache[path] = template;
+                // 添加到 LRU 缓存（缓存满时会自动移除最久未访问的）
+                _templateCache.Set(path, template);
                 return template;
             }
             template.Dispose();
@@ -360,9 +475,15 @@ public class StateDetector
 
     public void ClearTemplateCache()
     {
-        foreach (var kvp in _templateCache)
-            kvp.Value.Dispose();
         _templateCache.Clear();
+    }
+    
+    /// <summary>
+    /// 获取模板缓存统计信息
+    /// </summary>
+    public string GetTemplateCacheStatistics()
+    {
+        return _templateCache.GetStatistics();
     }
 
     public bool DetectCombatState()

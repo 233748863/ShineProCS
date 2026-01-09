@@ -12,6 +12,16 @@ public class GameState
     /// </summary>
     public double TargetHpPercent { get; set; } = 100.0;
     
+    /// <summary>
+    /// HP值是否为缓存值（检测失败时）
+    /// </summary>
+    public bool IsHpCached { get; set; }
+    
+    /// <summary>
+    /// MP值是否为缓存值（检测失败时）
+    /// </summary>
+    public bool IsMpCached { get; set; }
+    
     public bool HasTarget { get; set; }
     public bool InCombat { get; set; }
     public bool IsCasting { get; set; }

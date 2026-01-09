@@ -22,6 +22,11 @@ public class StrategyContext
     /// 当前循环模式（Default/Smart）
     /// </summary>
     public string LoopMode { get; set; } = "Default";
+    
+    /// <summary>
+    /// 应用程序设置，用于获取策略相关配置
+    /// </summary>
+    public AppSettings? Settings { get; set; }
 }
 
 /// <summary>

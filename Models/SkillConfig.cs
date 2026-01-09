@@ -181,6 +181,78 @@ public partial class SkillConfig : ObservableObject
     [ObservableProperty] private int _comboDelay = 100;
     
     /// <summary>
+    /// Buff检查延迟（毫秒）
+    /// 前置技能释放后等待Buff生效的时间
+    /// </summary>
+    [ObservableProperty] private int _buffCheckDelay = 200;
+    
+    /// <summary>
+    /// Buff检查重试次数
+    /// 前置技能释放后检查Buff的最大重试次数
+    /// </summary>
+    [ObservableProperty] private int _buffCheckRetries = 3;
+    
+    /// <summary>
+    /// 条件Buff - 技能释放前置条件
+    /// 只有当此Buff存在时才能释放该技能
+    /// </summary>
+    [ObservableProperty] private string _conditionBuff = "";
+    
+    /// <summary>
+    /// 优先级覆盖条件（Buff名称）
+    /// 当此Buff存在时，使用PriorityOverrideValue替代基础Priority
+    /// </summary>
+    [ObservableProperty] private string _priorityOverrideCondition = "";
+    
+    /// <summary>
+    /// 优先级覆盖值
+    /// 当PriorityOverrideCondition满足时使用的优先级值
+    /// </summary>
+    [ObservableProperty] private int _priorityOverrideValue;
+    
+    /// <summary>
+    /// MP优先级加成
+    /// 当MP高于MpThresholdForBoost时，将此值加到有效优先级上
+    /// </summary>
+    [ObservableProperty] private int _mpPriorityBoost;
+    
+    /// <summary>
+    /// MP加成阈值（百分比）
+    /// 当MP高于此百分比时，应用MpPriorityBoost加成
+    /// </summary>
+    [ObservableProperty] private double _mpThresholdForBoost;
+    
+    /// <summary>
+    /// 前置技能名称（通过名称引用）
+    /// 释放此技能前，先释放指定名称的前置技能
+    /// </summary>
+    [ObservableProperty] private string _preCastSkillName = "";
+    
+    /// <summary>
+    /// 技能组名称
+    /// 属于同一技能组的技能共享组级别的条件
+    /// </summary>
+    [ObservableProperty] private string _skillGroup = "";
+    
+    /// <summary>
+    /// 施法后设置状态
+    /// 技能成功释放后，将指定状态设为true
+    /// </summary>
+    [ObservableProperty] private string _setStateOnCast = "";
+    
+    /// <summary>
+    /// 施法后清除状态
+    /// 技能成功释放后，将指定状态设为false
+    /// </summary>
+    [ObservableProperty] private string _clearStateOnCast = "";
+    
+    /// <summary>
+    /// 要求状态为true才能释放
+    /// 只有当指定状态为true时才能选择此技能
+    /// </summary>
+    [ObservableProperty] private string _requireState = "";
+    
+    /// <summary>
     /// 是否显示释放条件配置面板（UI状态）
     /// </summary>
     [ObservableProperty] private bool _showReleaseCondition;

@@ -232,6 +232,30 @@ public class ConfigManager
         if (settings.GlobalCdColorTolerance < 0)
             settings.GlobalCdColorTolerance = 30;
         
+        // 验证帧变化检测阈值 (0=禁用, 正数为阈值)
+        if (settings.FrameChangeThreshold < 0)
+            settings.FrameChangeThreshold = 0;
+        else if (settings.FrameChangeThreshold > 255)
+            settings.FrameChangeThreshold = 255;
+        
+        // 验证公共CD检测模式 (0=自动, 1=颜色, 2=亮度)
+        if (settings.GlobalCdDetectionMode < 0)
+            settings.GlobalCdDetectionMode = 0;
+        else if (settings.GlobalCdDetectionMode > 2)
+            settings.GlobalCdDetectionMode = 0;
+        
+        // 验证联动技能优先级加成
+        if (settings.ComboSkillPriorityBonus < 0)
+            settings.ComboSkillPriorityBonus = 0;
+        else if (settings.ComboSkillPriorityBonus > 1000)
+            settings.ComboSkillPriorityBonus = 1000;
+        
+        // 验证模板缓存大小
+        if (settings.TemplateCacheSize < 10)
+            settings.TemplateCacheSize = 10;
+        else if (settings.TemplateCacheSize > 500)
+            settings.TemplateCacheSize = 500;
+        
         // 确保BuffLibrary已初始化
         settings.BuffLibrary ??= [];
         
@@ -283,6 +307,18 @@ public class ConfigManager
         
         if (skill.PreCastKeyCode < 0 || skill.PreCastKeyCode > 255)
             skill.PreCastKeyCode = 0;
+        
+        // 验证Buff检查延迟 (毫秒)
+        if (skill.BuffCheckDelay < 0)
+            skill.BuffCheckDelay = 0;
+        else if (skill.BuffCheckDelay > 5000)
+            skill.BuffCheckDelay = 5000;
+        
+        // 验证Buff检查重试次数
+        if (skill.BuffCheckRetries < 0)
+            skill.BuffCheckRetries = 0;
+        else if (skill.BuffCheckRetries > 10)
+            skill.BuffCheckRetries = 10;
         
         // 验证施法类型相关配置
         if ((int)skill.CastType < 0 || (int)skill.CastType > 2)

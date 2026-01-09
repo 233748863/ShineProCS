@@ -4,6 +4,27 @@ using CommunityToolkit.Mvvm.ComponentModel;
 namespace ShineProCS.Models;
 
 /// <summary>
+/// 公共CD检测模式枚举
+/// </summary>
+public enum GcdDetectionMode
+{
+    /// <summary>
+    /// 自动模式：有颜色配置时使用颜色检测，否则使用亮度检测
+    /// </summary>
+    Auto = 0,
+    
+    /// <summary>
+    /// 颜色检测模式：使用配置的GlobalCdColor进行颜色匹配
+    /// </summary>
+    Color = 1,
+    
+    /// <summary>
+    /// 亮度检测模式：使用GlobalCdBrightnessThreshold进行亮度检测
+    /// </summary>
+    Brightness = 2
+}
+
+/// <summary>
 /// 应用程序全局设置模型
 /// </summary>
 public partial class AppSettings : ObservableObject
@@ -97,6 +118,15 @@ public partial class AppSettings : ObservableObject
     
     #endregion
     
+    #region 技能组配置
+    
+    /// <summary>
+    /// 技能组集合 - 用于定义具有共享条件的技能组
+    /// </summary>
+    [ObservableProperty] private ObservableCollection<SkillGroupConfig> _skillGroups = [];
+    
+    #endregion
+    
     #region 颜色检测阈值配置（HSV空间）
     
     [ObservableProperty] private int _healthHueMin = 0;
@@ -130,6 +160,30 @@ public partial class AppSettings : ObservableObject
     [ObservableProperty] private uint _hotkeyPauseModifier = 2; // Ctrl
     [ObservableProperty] private uint _hotkeyPauseKey = 119; // F8
     [ObservableProperty] private bool _enableGlobalHotkeys = true;
+    
+    #endregion
+    
+    #region 高级配置
+    
+    /// <summary>
+    /// 帧变化检测阈值 (0=禁用检测, 默认15)
+    /// </summary>
+    [ObservableProperty] private int _frameChangeThreshold = 15;
+    
+    /// <summary>
+    /// 公共CD检测模式 (0=自动, 1=颜色, 2=亮度)
+    /// </summary>
+    [ObservableProperty] private int _globalCdDetectionMode = 0;
+    
+    /// <summary>
+    /// 联动技能优先级加成
+    /// </summary>
+    [ObservableProperty] private int _comboSkillPriorityBonus = 50;
+    
+    /// <summary>
+    /// 模板缓存大小
+    /// </summary>
+    [ObservableProperty] private int _templateCacheSize = 50;
     
     #endregion
 }
