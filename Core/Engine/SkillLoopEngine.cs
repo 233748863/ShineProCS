@@ -151,6 +151,9 @@ public class SkillLoopEngine
                 _skillStatesLock.ExitWriteLock();
             }
             
+            // 配置变更，标记边界框缓存失效
+            _stateDetector.InvalidateBoundingBoxCache();
+            
             Log($"已加载 {newStates.Count} 个技能", 1);
         }
         catch (Exception ex)
@@ -384,9 +387,28 @@ public class SkillLoopEngine
                 _unchangedFrameCount = 0;
                 _perfMonitor.StartOperation();
                 
-                // 优化：将当前帧设置为缓存帧，后续检测可以从中裁剪ROI
-                var detectionRegion = _config.AppSettings.DetectionRegion;
-                _stateDetector.SetCachedFrame(currentFrame, detectionRegion[0], detectionRegion[1]);
+                // 优化：计算包含所有检测区域的边界框，一次截取大区域
+                _skillStatesLock.EnterReadLock();
+                (int x, int y, int w, int h)? boundingBox;
+                try
+                {
+                    boundingBox = _stateDetector.CalculateDetectionBoundingBox(_skillStates);
+                }
+                finally
+                {
+                    _skillStatesLock.ExitReadLock();
+                }
+                
+                // 如果有有效的边界框，截取大区域并设置为缓存帧
+                if (boundingBox.HasValue)
+                {
+                    var (bx, by, bw, bh) = boundingBox.Value;
+                    var bigFrame = _image.GetScreenRegion(bx, by, bw, bh);
+                    if (bigFrame != null)
+                    {
+                        _stateDetector.SetCachedFrame(bigFrame, bx, by);
+                    }
+                }
                 
                 var gameState = _stateDetector.DetectGameState();
                 if (gameState.IsCasting) { Log("检测到读条中，等待...", 0); Thread.Sleep(DetectionConst.CastDetectionIntervalMs); continue; }

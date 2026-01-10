@@ -30,6 +30,10 @@ public class StateDetector : IDisposable
     // 缓存的大区域截图（用于单帧多检测优化）
     private Mat? _cachedFrame;
     private int _cachedFrameX, _cachedFrameY;
+    
+    // 边界框缓存（配置不变时不重新计算）
+    private (int x, int y, int w, int h)? _cachedBoundingBox;
+    private bool _boundingBoxDirty = true;
 
     public StateDetector(IImageInterface image, ConfigManager config, TemplatePreloader? preloader = null)
     {
@@ -67,6 +71,15 @@ public class StateDetector : IDisposable
             _cachedFrame = null;
         }
     }
+    
+    /// <summary>
+    /// 标记边界框缓存失效（配置变更时调用）
+    /// </summary>
+    public void InvalidateBoundingBoxCache()
+    {
+        _boundingBoxDirty = true;
+        _cachedBoundingBox = null;
+    }
 
     /// <summary>
     /// 设置当前帧的大区域截图（由引擎在循环开始时调用）
@@ -81,6 +94,82 @@ public class StateDetector : IDisposable
         _cachedFrame = frame;
         _cachedFrameX = frameX;
         _cachedFrameY = frameY;
+    }
+    
+    /// <summary>
+    /// 计算包含所有需要检测区域的边界框（带缓存）
+    /// 包括：技能图标、HP/MP条、Buff图标等
+    /// </summary>
+    /// <param name="skillStates">技能状态列表</param>
+    /// <returns>边界框 (minX, minY, width, height)，如果没有有效区域则返回null</returns>
+    public (int x, int y, int w, int h)? CalculateDetectionBoundingBox(IList<SkillRuntimeState> skillStates)
+    {
+        // 如果缓存有效，直接返回
+        if (!_boundingBoxDirty && _cachedBoundingBox.HasValue)
+            return _cachedBoundingBox;
+        
+        var settings = _config.AppSettings;
+        var regions = new List<int[]>();
+        
+        // 添加技能图标区域
+        foreach (var state in skillStates)
+        {
+            if (state.Config.Enabled && state.Config.IconRegion.Any(v => v > 0))
+                regions.Add(state.Config.IconRegion);
+        }
+        
+        // 添加HP/MP条区域
+        if (settings.HealthBarRegion.Any(v => v > 0))
+            regions.Add(settings.HealthBarRegion);
+        if (settings.ManaBarRegion.Any(v => v > 0))
+            regions.Add(settings.ManaBarRegion);
+        if (settings.TargetHealthBarRegion.Any(v => v > 0))
+            regions.Add(settings.TargetHealthBarRegion);
+        
+        // 添加Buff库中的区域
+        foreach (var buff in settings.BuffLibrary)
+        {
+            if (buff.Enabled && buff.IconRegion.Any(v => v > 0))
+                regions.Add(buff.IconRegion);
+        }
+        
+        if (regions.Count == 0)
+        {
+            _cachedBoundingBox = null;
+            _boundingBoxDirty = false;
+            return null;
+        }
+        
+        // 计算边界框
+        int minX = int.MaxValue, minY = int.MaxValue;
+        int maxX = int.MinValue, maxY = int.MinValue;
+        
+        foreach (var region in regions)
+        {
+            if (region.Length < 4 || region[2] <= 0 || region[3] <= 0)
+                continue;
+            
+            var x = region[0];
+            var y = region[1];
+            var w = region[2];
+            var h = region[3];
+            
+            if (x < minX) minX = x;
+            if (y < minY) minY = y;
+            if (x + w > maxX) maxX = x + w;
+            if (y + h > maxY) maxY = y + h;
+        }
+        
+        if (minX == int.MaxValue)
+        {
+            _cachedBoundingBox = null;
+            _boundingBoxDirty = false;
+            return null;
+        }
+        
+        _cachedBoundingBox = (minX, minY, maxX - minX, maxY - minY);
+        _boundingBoxDirty = false;
+        return _cachedBoundingBox;
     }
     
     /// <summary>
@@ -150,22 +239,33 @@ public class StateDetector : IDisposable
     }
 
     /// <summary>
-    /// 并行更新多个技能的视觉状态（优化版：使用缓存帧）
+    /// 并行更新多个技能的视觉状态（优化版：使用缓存帧 + CD跳过）
     /// </summary>
     public void UpdateSkillStatesParallel(IList<SkillRuntimeState> states)
     {
         if (states.Count == 0) return;
 
-        var toDetect = states.Where(s => 
-            s.Config.Enabled && 
-            s.Config.IconRegion.Any(v => v > 0)).ToList();
-
-        if (toDetect.Count == 0)
+        // 优化1：跳过CD中的技能，直接标记为不可用
+        var toDetect = new List<SkillRuntimeState>();
+        foreach (var s in states)
         {
-            foreach (var s in states)
+            if (!s.Config.Enabled || s.Config.IconRegion.All(v => v == 0))
+            {
                 s.IsVisuallyReady = true;
-            return;
+                continue;
+            }
+            
+            // 如果技能在CD中（剩余CD > 0.5秒），跳过视觉检测
+            if (s.RemainingCooldown > 0.5)
+            {
+                s.IsVisuallyReady = false;
+                continue;
+            }
+            
+            toDetect.Add(s);
         }
+
+        if (toDetect.Count == 0) return;
 
         // 使用并行处理，但每个任务从缓存帧裁剪而不是单独截图
         if (toDetect.Count >= DetectionConst.ParallelDetectionThreshold)
@@ -180,9 +280,6 @@ public class StateDetector : IDisposable
             foreach (var state in toDetect)
                 UpdateSkillStateOptimized(state);
         }
-
-        foreach (var s in states.Where(s => !toDetect.Contains(s)))
-            s.IsVisuallyReady = true;
     }
     
     /// <summary>
@@ -240,15 +337,35 @@ public class StateDetector : IDisposable
     }
     
     /// <summary>
-    /// 使用已有帧进行模板匹配检测
+    /// 使用已有帧进行模板匹配检测（优化版：缩小尺寸加速匹配）
     /// </summary>
     private bool CheckSkillByTemplateWithFrame(SkillConfig skill, Mat frame)
     {
         var template = GetTemplate(skill.TemplatePath);
         if (template == null) return true;
         
-        var similarity = _image.MatchTemplate(frame, template);
-        return similarity >= skill.SimilarityThreshold;
+        // 优化3：缩小模板和帧到50%尺寸，加速匹配
+        var scaleFactor = 0.5;
+        var newWidth = Math.Max(8, (int)(frame.Width * scaleFactor));
+        var newHeight = Math.Max(8, (int)(frame.Height * scaleFactor));
+        var templateNewWidth = Math.Max(8, (int)(template.Width * scaleFactor));
+        var templateNewHeight = Math.Max(8, (int)(template.Height * scaleFactor));
+        
+        // 如果尺寸太小，直接用原图匹配
+        if (newWidth < 16 || newHeight < 16 || templateNewWidth < 8 || templateNewHeight < 8)
+        {
+            var similarity = _image.MatchTemplate(frame, template);
+            return similarity >= skill.SimilarityThreshold;
+        }
+        
+        using var smallFrame = new Mat();
+        using var smallTemplate = new Mat();
+        Cv2.Resize(frame, smallFrame, new OpenCvSharp.Size(newWidth, newHeight), 0, 0, InterpolationFlags.Area);
+        Cv2.Resize(template, smallTemplate, new OpenCvSharp.Size(templateNewWidth, templateNewHeight), 0, 0, InterpolationFlags.Area);
+        
+        var sim = _image.MatchTemplate(smallFrame, smallTemplate);
+        // 缩小后匹配精度略有下降，阈值降低5%
+        return sim >= (skill.SimilarityThreshold - 0.05);
     }
     
     /// <summary>
@@ -292,38 +409,50 @@ public class StateDetector : IDisposable
         
         try
         {
+            // 优化2：使用采样点检测代替全区域HSV扫描
+            // 沿着血条/蓝条的中线采样，检测有颜色的比例
             var settings = _config.AppSettings;
+            int width = frame.Width;
+            int height = frame.Height;
+            int midY = height / 2;
             
-            using var hsv = new Mat();
-            Cv2.CvtColor(frame, hsv, ColorConversionCodes.BGR2HSV);
+            // 采样点数量（最多20个点，最少5个点）
+            int sampleCount = Math.Max(5, Math.Min(20, width / 5));
+            int matchCount = 0;
             
-            using var mask = new Mat();
-            if (isHealth)
+            unsafe
             {
-                using var maskRed = new Mat();
-                using var maskGreen = new Mat();
+                var ptr = (byte*)frame.DataPointer;
+                int stride = (int)frame.Step();
+                int channels = frame.Channels();
                 
-                Cv2.InRange(hsv, 
-                    new Scalar(settings.HealthHueMin, settings.HealthSatMin, settings.HealthValMin), 
-                    new Scalar(settings.HealthHueMax, 255, 255), 
-                    maskRed);
-                Cv2.InRange(hsv, 
-                    new Scalar(settings.HealthGreenHueMin, settings.HealthSatMin, settings.HealthValMin), 
-                    new Scalar(settings.HealthGreenHueMax, 255, 255), 
-                    maskGreen);
-                Cv2.BitwiseOr(maskRed, maskGreen, mask);
-            }
-            else
-            {
-                Cv2.InRange(hsv, 
-                    new Scalar(settings.ManaHueMin, settings.ManaSatMin, settings.ManaValMin), 
-                    new Scalar(settings.ManaHueMax, 255, 255), 
-                    mask);
+                for (int i = 0; i < sampleCount; i++)
+                {
+                    int x = (i * width) / sampleCount;
+                    int offset = midY * stride + x * channels;
+                    
+                    byte b = ptr[offset];
+                    byte g = ptr[offset + 1];
+                    byte r = ptr[offset + 2];
+                    
+                    // 简化的颜色匹配（不用HSV转换）
+                    if (isHealth)
+                    {
+                        // 红色血条：R高，G/B低 或 绿色血条：G高，R/B较低
+                        bool isRed = r > 150 && r > g + 30 && r > b + 30;
+                        bool isGreen = g > 100 && g > r && g > b;
+                        if (isRed || isGreen) matchCount++;
+                    }
+                    else
+                    {
+                        // 蓝色蓝条：B高，R/G较低
+                        bool isBlue = b > 100 && b > r && b > g - 30;
+                        if (isBlue) matchCount++;
+                    }
+                }
             }
             
-            var nonZero = Cv2.CountNonZero(mask);
-            var total = frame.Width * frame.Height;
-            var percent = (double)nonZero / total * 100.0;
+            var percent = (double)matchCount / sampleCount * 100.0;
             var result = Math.Min(100.0, Math.Max(0.0, percent));
             
             // 检测成功，更新缓存
