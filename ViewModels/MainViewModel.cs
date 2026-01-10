@@ -518,8 +518,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
             _currentHpPercent = s.HpPercent;
             _currentMpPercent = s.MpPercent;
             
-            // 更新悬浮窗
-            _overlay?.UpdateStatus(s.Mode, s.ExecutionCount, s.AvgResponseTime * 1000, 
+            // 更新悬浮窗（AvgResponseTime 已经是毫秒单位，无需转换）
+            _overlay?.UpdateStatus(s.Mode, s.ExecutionCount, s.AvgResponseTime, 
                 _nextSkillName, _currentHpPercent, _currentMpPercent);
             
             // 更新技能状态列表

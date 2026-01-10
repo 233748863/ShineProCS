@@ -10,6 +10,7 @@ namespace ShineProCS.Core.Services;
 /// <summary>
 /// 游戏状态检测器
 /// 负责检测HP/MP、技能状态、Buff状态等
+/// 优化：使用单次大区域截图 + ROI裁剪，减少截图API调用次数
 /// </summary>
 public class StateDetector : IDisposable
 {
@@ -25,6 +26,10 @@ public class StateDetector : IDisposable
     private int _consecutiveHpFailures = 0;
     private int _consecutiveMpFailures = 0;
     private const int MaxConsecutiveFailures = 5;
+    
+    // 缓存的大区域截图（用于单帧多检测优化）
+    private Mat? _cachedFrame;
+    private int _cachedFrameX, _cachedFrameY;
 
     public StateDetector(IImageInterface image, ConfigManager config, TemplatePreloader? preloader = null)
     {
@@ -47,7 +52,64 @@ public class StateDetector : IDisposable
         _disposed = true;
         
         _templateCache.Dispose();
+        ClearCachedFrame();
         GC.SuppressFinalize(this);
+    }
+    
+    /// <summary>
+    /// 清除缓存的帧
+    /// </summary>
+    private void ClearCachedFrame()
+    {
+        if (_cachedFrame != null)
+        {
+            _image.ReturnMat(_cachedFrame);
+            _cachedFrame = null;
+        }
+    }
+
+    /// <summary>
+    /// 设置当前帧的大区域截图（由引擎在循环开始时调用）
+    /// 这样后续的所有检测都可以从这个大图中裁剪，避免重复截图
+    /// </summary>
+    /// <param name="frame">大区域截图</param>
+    /// <param name="frameX">截图区域的屏幕X坐标</param>
+    /// <param name="frameY">截图区域的屏幕Y坐标</param>
+    public void SetCachedFrame(Mat frame, int frameX, int frameY)
+    {
+        ClearCachedFrame();
+        _cachedFrame = frame;
+        _cachedFrameX = frameX;
+        _cachedFrameY = frameY;
+    }
+    
+    /// <summary>
+    /// 从缓存的大图中裁剪指定区域
+    /// </summary>
+    /// <param name="region">屏幕坐标的区域 [x, y, w, h]</param>
+    /// <returns>裁剪后的子图，如果区域不在缓存范围内则返回null</returns>
+    private Mat? GetRegionFromCache(int[] region)
+    {
+        if (_cachedFrame == null || region.Length < 4)
+            return null;
+        
+        // 将屏幕坐标转换为缓存帧内的相对坐标
+        int relX = region[0] - _cachedFrameX;
+        int relY = region[1] - _cachedFrameY;
+        int w = region[2];
+        int h = region[3];
+        
+        // 检查是否在缓存帧范围内
+        if (relX < 0 || relY < 0 || 
+            relX + w > _cachedFrame.Width || 
+            relY + h > _cachedFrame.Height)
+        {
+            return null; // 区域不在缓存范围内，需要单独截图
+        }
+        
+        // 从缓存帧中裁剪ROI（不复制数据，只是创建视图）
+        var roi = new Rect(relX, relY, w, h);
+        return new Mat(_cachedFrame, roi).Clone(); // Clone确保数据独立
     }
 
     /// <summary>
@@ -88,18 +150,11 @@ public class StateDetector : IDisposable
     }
 
     /// <summary>
-    /// 并行更新多个技能的视觉状态
+    /// 并行更新多个技能的视觉状态（优化版：使用缓存帧）
     /// </summary>
     public void UpdateSkillStatesParallel(IList<SkillRuntimeState> states)
     {
         if (states.Count == 0) return;
-        
-        if (states.Count < DetectionConst.ParallelDetectionThreshold)
-        {
-            foreach (var state in states)
-                UpdateSkillState(state);
-            return;
-        }
 
         var toDetect = states.Where(s => 
             s.Config.Enabled && 
@@ -112,13 +167,100 @@ public class StateDetector : IDisposable
             return;
         }
 
-        Parallel.ForEach(toDetect, new ParallelOptions { MaxDegreeOfParallelism = DetectionConst.MaxParallelDegree }, state =>
+        // 使用并行处理，但每个任务从缓存帧裁剪而不是单独截图
+        if (toDetect.Count >= DetectionConst.ParallelDetectionThreshold)
         {
-            UpdateSkillState(state);
-        });
+            Parallel.ForEach(toDetect, new ParallelOptions { MaxDegreeOfParallelism = DetectionConst.MaxParallelDegree }, state =>
+            {
+                UpdateSkillStateOptimized(state);
+            });
+        }
+        else
+        {
+            foreach (var state in toDetect)
+                UpdateSkillStateOptimized(state);
+        }
 
         foreach (var s in states.Where(s => !toDetect.Contains(s)))
             s.IsVisuallyReady = true;
+    }
+    
+    /// <summary>
+    /// 优化版技能状态更新：优先从缓存帧裁剪
+    /// </summary>
+    private void UpdateSkillStateOptimized(SkillRuntimeState state)
+    {
+        var region = state.Config.IconRegion;
+        
+        if (region.All(v => v == 0))
+        {
+            state.IsVisuallyReady = true;
+            return;
+        }
+        
+        // 尝试从缓存帧获取
+        var frame = GetRegionFromCache(region);
+        bool fromCache = frame != null;
+        
+        // 如果缓存中没有，则单独截图
+        if (frame == null)
+        {
+            frame = _image.GetScreenRegion(region[0], region[1], region[2], region[3]);
+        }
+        
+        if (frame == null)
+        {
+            state.IsVisuallyReady = true;
+            return;
+        }
+        
+        try
+        {
+            if (!string.IsNullOrEmpty(state.Config.TemplatePath) && File.Exists(state.Config.TemplatePath))
+            {
+                state.IsVisuallyReady = CheckSkillByTemplateWithFrame(state.Config, frame);
+            }
+            else
+            {
+                state.IsVisuallyReady = CheckSkillByBrightnessWithFrame(frame);
+            }
+        }
+        finally
+        {
+            // 从缓存裁剪的需要释放Clone的副本
+            if (fromCache)
+            {
+                frame.Dispose();
+            }
+            else
+            {
+                _image.ReturnMat(frame);
+            }
+        }
+    }
+    
+    /// <summary>
+    /// 使用已有帧进行模板匹配检测
+    /// </summary>
+    private bool CheckSkillByTemplateWithFrame(SkillConfig skill, Mat frame)
+    {
+        var template = GetTemplate(skill.TemplatePath);
+        if (template == null) return true;
+        
+        var similarity = _image.MatchTemplate(frame, template);
+        return similarity >= skill.SimilarityThreshold;
+    }
+    
+    /// <summary>
+    /// 使用已有帧进行亮度检测
+    /// </summary>
+    private bool CheckSkillByBrightnessWithFrame(Mat frame)
+    {
+        using var gray = new Mat();
+        Cv2.CvtColor(frame, gray, ColorConversionCodes.BGR2GRAY);
+        var mean = Cv2.Mean(gray);
+        
+        return mean.Val0 > _config.AppSettings.SkillBrightnessThreshold;
     }
 
     private double DetectBarPercent(int[] region, bool isHealth, out bool isCached)
@@ -127,47 +269,23 @@ public class StateDetector : IDisposable
         
         if (region.Length < 4 || region[2] <= 0 || region[3] <= 0)
         {
-            // 记录检测失败
-            if (isHealth)
-            {
-                _consecutiveHpFailures++;
-                if (_consecutiveHpFailures >= MaxConsecutiveFailures)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[StateDetector] HP检测连续失败{_consecutiveHpFailures}次，使用缓存值: {_lastValidHpPercent}%");
-                }
-            }
-            else
-            {
-                _consecutiveMpFailures++;
-                if (_consecutiveMpFailures >= MaxConsecutiveFailures)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[StateDetector] MP检测连续失败{_consecutiveMpFailures}次，使用缓存值: {_lastValidMpPercent}%");
-                }
-            }
+            RecordDetectionFailure(isHealth);
             isCached = true;
             return isHealth ? _lastValidHpPercent : _lastValidMpPercent;
         }
         
-        var frame = _image.GetScreenRegion(region[0], region[1], region[2], region[3]);
+        // 优先从缓存帧获取
+        var frame = GetRegionFromCache(region);
+        bool fromCache = frame != null;
+        
         if (frame == null)
         {
-            // 记录检测失败
-            if (isHealth)
-            {
-                _consecutiveHpFailures++;
-                if (_consecutiveHpFailures >= MaxConsecutiveFailures)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[StateDetector] HP检测连续失败{_consecutiveHpFailures}次，使用缓存值: {_lastValidHpPercent}%");
-                }
-            }
-            else
-            {
-                _consecutiveMpFailures++;
-                if (_consecutiveMpFailures >= MaxConsecutiveFailures)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[StateDetector] MP检测连续失败{_consecutiveMpFailures}次，使用缓存值: {_lastValidMpPercent}%");
-                }
-            }
+            frame = _image.GetScreenRegion(region[0], region[1], region[2], region[3]);
+        }
+        
+        if (frame == null)
+        {
+            RecordDetectionFailure(isHealth);
             isCached = true;
             return isHealth ? _lastValidHpPercent : _lastValidMpPercent;
         }
@@ -224,7 +342,34 @@ public class StateDetector : IDisposable
         }
         finally
         {
-            _image.ReturnMat(frame);
+            if (fromCache)
+            {
+                frame.Dispose();
+            }
+            else
+            {
+                _image.ReturnMat(frame);
+            }
+        }
+    }
+    
+    private void RecordDetectionFailure(bool isHealth)
+    {
+        if (isHealth)
+        {
+            _consecutiveHpFailures++;
+            if (_consecutiveHpFailures >= MaxConsecutiveFailures)
+            {
+                System.Diagnostics.Debug.WriteLine($"[StateDetector] HP检测连续失败{_consecutiveHpFailures}次，使用缓存值: {_lastValidHpPercent}%");
+            }
+        }
+        else
+        {
+            _consecutiveMpFailures++;
+            if (_consecutiveMpFailures >= MaxConsecutiveFailures)
+            {
+                System.Diagnostics.Debug.WriteLine($"[StateDetector] MP检测连续失败{_consecutiveMpFailures}次，使用缓存值: {_lastValidMpPercent}%");
+            }
         }
     }
     
@@ -260,12 +405,6 @@ public class StateDetector : IDisposable
         };
     }
     
-    /// <summary>
-    /// 使用颜色匹配检测公共CD
-    /// </summary>
-    /// <param name="color">检测点的颜色</param>
-    /// <param name="settings">应用设置</param>
-    /// <returns>是否正在公共CD中</returns>
     private static bool DetectGcdByColor((byte r, byte g, byte b) color, AppSettings settings)
     {
         if (settings.GlobalCdColor.Length < 3)
@@ -276,27 +415,18 @@ public class StateDetector : IDisposable
         var targetB = settings.GlobalCdColor[2];
         var tolerance = settings.GlobalCdColorTolerance;
         
-        // 颜色匹配 = 正在公共CD中
         return Math.Abs(color.r - targetR) <= tolerance &&
                Math.Abs(color.g - targetG) <= tolerance &&
                Math.Abs(color.b - targetB) <= tolerance;
     }
     
-    /// <summary>
-    /// 使用亮度检测公共CD
-    /// </summary>
-    /// <param name="color">检测点的颜色</param>
-    /// <param name="settings">应用设置</param>
-    /// <returns>是否正在公共CD中</returns>
     private static bool DetectGcdByBrightness((byte r, byte g, byte b) color, AppSettings settings)
     {
         var brightness = (color.r + color.g + color.b) / 3.0;
         
-        // 亮度超过阈值 = 正在公共CD中
         if (brightness > settings.GlobalCdBrightnessThreshold)
             return true;
         
-        // 兼容旧逻辑：黄色检测（某些游戏的GCD指示器）
         if (color.r > 150 && color.g > 150 && color.b < 100)
             return true;
         
@@ -304,7 +434,7 @@ public class StateDetector : IDisposable
     }
 
     /// <summary>
-    /// 更新单个技能视觉状态
+    /// 更新单个技能视觉状态（兼容旧接口）
     /// </summary>
     public void UpdateSkillState(SkillRuntimeState state, Mat? frame = null)
     {
@@ -382,7 +512,7 @@ public class StateDetector : IDisposable
             .FirstOrDefault(b => b.Name == buffName && b.Enabled);
         
         if (buffConfig == null)
-            return true; // 未配置的Buff默认视为存在
+            return true;
         
         var region = buffConfig.IconRegion;
         if (region.All(v => v == 0))
@@ -400,7 +530,15 @@ public class StateDetector : IDisposable
         if (region.Length < 4 || region[2] <= 0 || region[3] <= 0)
             return true;
         
-        var frame = _image.GetScreenRegion(region[0], region[1], region[2], region[3]);
+        // 优先从缓存帧获取
+        var frame = GetRegionFromCache(region);
+        bool fromCache = frame != null;
+        
+        if (frame == null)
+        {
+            frame = _image.GetScreenRegion(region[0], region[1], region[2], region[3]);
+        }
+        
         if (frame == null) return false;
         
         try
@@ -413,7 +551,10 @@ public class StateDetector : IDisposable
         }
         finally
         {
-            _image.ReturnMat(frame);
+            if (fromCache)
+                frame.Dispose();
+            else
+                _image.ReturnMat(frame);
         }
     }
 
@@ -422,7 +563,15 @@ public class StateDetector : IDisposable
         if (region.Length < 4 || region[2] <= 0 || region[3] <= 0)
             return true;
         
-        var frame = _image.GetScreenRegion(region[0], region[1], region[2], region[3]);
+        // 优先从缓存帧获取
+        var frame = GetRegionFromCache(region);
+        bool fromCache = frame != null;
+        
+        if (frame == null)
+        {
+            frame = _image.GetScreenRegion(region[0], region[1], region[2], region[3]);
+        }
+        
         if (frame == null) return false;
         
         try
@@ -435,7 +584,10 @@ public class StateDetector : IDisposable
         }
         finally
         {
-            _image.ReturnMat(frame);
+            if (fromCache)
+                frame.Dispose();
+            else
+                _image.ReturnMat(frame);
         }
     }
 
@@ -443,14 +595,12 @@ public class StateDetector : IDisposable
     {
         if (string.IsNullOrEmpty(path)) return null;
         
-        // 优先从预加载器获取
         if (_preloader != null)
         {
             var preloaded = _preloader.GetTemplate(path);
             if (preloaded != null) return preloaded;
         }
         
-        // 从 LRU 缓存获取
         var cached = _templateCache.Get(path);
         if (cached != null)
             return cached;
@@ -462,7 +612,6 @@ public class StateDetector : IDisposable
             var template = Cv2.ImRead(path, ImreadModes.Color);
             if (!template.Empty())
             {
-                // 添加到 LRU 缓存（缓存满时会自动移除最久未访问的）
                 _templateCache.Set(path, template);
                 return template;
             }
@@ -478,9 +627,6 @@ public class StateDetector : IDisposable
         _templateCache.Clear();
     }
     
-    /// <summary>
-    /// 获取模板缓存统计信息
-    /// </summary>
     public string GetTemplateCacheStatistics()
     {
         return _templateCache.GetStatistics();
@@ -497,35 +643,6 @@ public class StateDetector : IDisposable
             
             if (state.IsGlobalCdActive)
                 return true;
-            
-            var settings = _config.AppSettings;
-            if (settings.DetectionRegion.Any(v => v > 0))
-            {
-                var frame = _image.GetScreenRegion(
-                    settings.DetectionRegion[0], 
-                    settings.DetectionRegion[1], 
-                    settings.DetectionRegion[2], 
-                    settings.DetectionRegion[3]);
-                
-                if (frame != null)
-                {
-                    try
-                    {
-                        using var gray = new Mat();
-                        Cv2.CvtColor(frame, gray, ColorConversionCodes.BGR2GRAY);
-                        using var threshold = new Mat();
-                        Cv2.Threshold(gray, threshold, 200, 255, ThresholdTypes.Binary);
-                        var nonZero = Cv2.CountNonZero(threshold);
-                        
-                        if (nonZero > 100)
-                            return true;
-                    }
-                    finally
-                    {
-                        _image.ReturnMat(frame);
-                    }
-                }
-            }
             
             return false;
         }

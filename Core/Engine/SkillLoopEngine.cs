@@ -383,6 +383,11 @@ public class SkillLoopEngine
                 }
                 _unchangedFrameCount = 0;
                 _perfMonitor.StartOperation();
+                
+                // 优化：将当前帧设置为缓存帧，后续检测可以从中裁剪ROI
+                var detectionRegion = _config.AppSettings.DetectionRegion;
+                _stateDetector.SetCachedFrame(currentFrame, detectionRegion[0], detectionRegion[1]);
+                
                 var gameState = _stateDetector.DetectGameState();
                 if (gameState.IsCasting) { Log("检测到读条中，等待...", 0); Thread.Sleep(DetectionConst.CastDetectionIntervalMs); continue; }
                 
