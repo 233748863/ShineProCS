@@ -81,31 +81,31 @@
             <!-- 实时预览区域 -->
             <ui:Card>
                 <DockPanel>
-                    <DockPanel DockPanel.Dock="Top" Margin="0,0,0,12">
-                        <TextBlock Text="实时预览" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                        <TextBlock Text="实时预览" FontSize="14" FontWeight="Medium" VerticalAlignment="Center" Foreground="#AAA"/>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                            <TextBlock x:Name="PreviewFps" Text="-- FPS" Foreground="#888" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                            <TextBlock x:Name="PreviewFps" Text="0 FPS" Foreground="#666" FontSize="12" VerticalAlignment="Center" Margin="0,0,12,0"/>
                             <CheckBox x:Name="AutoPreviewCheck" Content="自动刷新" IsChecked="True" VerticalAlignment="Center" Checked="AutoPreview_Changed" Unchecked="AutoPreview_Changed"/>
                         </StackPanel>
                     </DockPanel>
                     
                     <!-- 预览画面 -->
-                    <Border Background="#111" CornerRadius="8" MinHeight="200">
+                    <Border Background="#1A1A1A" CornerRadius="6" MinHeight="180" BorderBrush="#333" BorderThickness="1">
                         <Grid>
-                            <Image x:Name="PreviewImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor"/>
+                            <Image x:Name="PreviewImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor" Margin="4"/>
                             <Canvas x:Name="PreviewOverlay" IsHitTestVisible="False"/>
                             
                             <!-- 无选中技能提示 -->
                             <StackPanel x:Name="NoSelectionHint" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                <TextBlock Text="👆" FontSize="32" HorizontalAlignment="Center" Opacity="0.5"/>
-                                <TextBlock Text="选择一个技能查看预览" Foreground="#666" FontSize="14" Margin="0,8,0,0"/>
-                                <TextBlock Text="或点击技能卡片的[视觉检测]标签配置" Foreground="#555" FontSize="12" Margin="0,4,0,0"/>
+                                <TextBlock Text="👆" FontSize="28" HorizontalAlignment="Center" Opacity="0.4"/>
+                                <TextBlock Text="选择一个技能查看预览" Foreground="#555" FontSize="13" Margin="0,6,0,0"/>
+                                <TextBlock Text="或点击技能卡片的[视觉检测]标签配置" Foreground="#444" FontSize="11" Margin="0,4,0,0"/>
                             </StackPanel>
                         </Grid>
                     </Border>
                     
                     <!-- 预览状态栏 -->
-                    <Border DockPanel.Dock="Bottom" Background="#252525" CornerRadius="0,0,8,8" Padding="12,8" Margin="0,8,0,0">
+                    <Border DockPanel.Dock="Bottom" Padding="4,6" Margin="0,6,0,0">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -113,13 +113,13 @@
                             </Grid.ColumnDefinitions>
                             
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock x:Name="PreviewSkillName" Text="技能: --" Foreground="#CCC" VerticalAlignment="Center"/>
-                                <Border x:Name="PreviewMatchBadge" Background="#4CAF50" CornerRadius="4" Padding="8,2" Margin="12,0,0,0" Visibility="Collapsed">
-                                    <TextBlock x:Name="PreviewMatchText" Text="匹配: 95%" FontSize="11" Foreground="White"/>
+                                <TextBlock x:Name="PreviewSkillName" Text="技能: --" Foreground="#888" FontSize="12" VerticalAlignment="Center"/>
+                                <Border x:Name="PreviewMatchBadge" Background="#4CAF50" CornerRadius="3" Padding="6,2" Margin="10,0,0,0" Visibility="Collapsed">
+                                    <TextBlock x:Name="PreviewMatchText" Text="匹配: 95%" FontSize="10" Foreground="White"/>
                                 </Border>
                             </StackPanel>
                             
-                            <TextBlock Grid.Column="1" x:Name="PreviewRegionInfo" Text="区域: --" Foreground="#888" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="1" x:Name="PreviewRegionInfo" Text="区域: --" Foreground="#666" FontSize="12" VerticalAlignment="Center"/>
                         </Grid>
                     </Border>
                 </DockPanel>
@@ -127,21 +127,21 @@
             
             <!-- 快速帮助 -->
             <ui:Card Grid.Row="1" Margin="0,12,0,0">
-                <Expander Header="💡 快速帮助" IsExpanded="False">
+                <Expander Header="⚡ 快速帮助" IsExpanded="False">
                     <StackPanel Margin="0,8,0,0">
-                        <TextBlock Text="配置步骤：" FontWeight="SemiBold" Margin="0,0,0,8"/>
-                        <TextBlock Text="1. 点击技能卡片展开配置" Foreground="#CCC" Margin="0,0,0,4"/>
-                        <TextBlock Text="2. 在[视觉检测]标签中点击[一键配置]" Foreground="#CCC" Margin="0,0,0,4"/>
-                        <TextBlock Text="3. 框选游戏中的技能图标区域" Foreground="#CCC" Margin="0,0,0,4"/>
-                        <TextBlock Text="4. 系统自动截取模板并测试匹配" Foreground="#CCC" Margin="0,0,0,4"/>
-                        <TextBlock Text="5. 点击[保存配置]完成" Foreground="#CCC"/>
+                        <TextBlock Text="配置步骤" FontWeight="Medium" FontSize="12" Foreground="#AAA" Margin="0,0,0,6"/>
+                        <TextBlock Text="1. 点击技能卡片展开配置" Foreground="#777" FontSize="12" Margin="0,0,0,3"/>
+                        <TextBlock Text="2. 在[视觉检测]标签中点击[一键配置]" Foreground="#777" FontSize="12" Margin="0,0,0,3"/>
+                        <TextBlock Text="3. 框选游戏中的技能图标区域" Foreground="#777" FontSize="12" Margin="0,0,0,3"/>
+                        <TextBlock Text="4. 系统自动截取模板并测试匹配" Foreground="#777" FontSize="12" Margin="0,0,0,3"/>
+                        <TextBlock Text="5. 点击[保存配置]完成" Foreground="#777" FontSize="12"/>
                         
-                        <Separator Margin="0,12"/>
+                        <Separator Margin="0,10" Opacity="0.3"/>
                         
-                        <TextBlock Text="提示：" FontWeight="SemiBold" Margin="0,0,0,8"/>
-                        <TextBlock Text="• 确保技能图标处于可用状态(非冷却中)再截取" Foreground="#888" TextWrapping="Wrap" Margin="0,0,0,4"/>
-                        <TextBlock Text="• 匹配度建议保持在80%以上" Foreground="#888" TextWrapping="Wrap" Margin="0,0,0,4"/>
-                        <TextBlock Text="• 可以拖拽技能卡片调整优先级顺序" Foreground="#888" TextWrapping="Wrap"/>
+                        <TextBlock Text="提示" FontWeight="Medium" FontSize="12" Foreground="#AAA" Margin="0,0,0,6"/>
+                        <TextBlock Text="• 确保技能图标处于可用状态再截取" Foreground="#666" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,3"/>
+                        <TextBlock Text="• 匹配度建议保持在80%以上" Foreground="#666" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,3"/>
+                        <TextBlock Text="• 可以拖拽技能卡片调整优先级" Foreground="#666" FontSize="11" TextWrapping="Wrap"/>
                     </StackPanel>
                 </Expander>
             </ui:Card>

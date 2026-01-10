@@ -199,6 +199,12 @@ public partial class SkillConfig : ObservableObject
     [ObservableProperty] private string _conditionBuff = "";
     
     /// <summary>
+    /// 排除条件Buff - 当此Buff存在时跳过该技能
+    /// 与ConditionBuff相反：ConditionBuff要求Buff存在，ExcludeConditionBuff要求Buff不存在
+    /// </summary>
+    [ObservableProperty] private string _excludeConditionBuff = "";
+    
+    /// <summary>
     /// 优先级覆盖条件（Buff名称）
     /// 当此Buff存在时，使用PriorityOverrideValue替代基础Priority
     /// </summary>

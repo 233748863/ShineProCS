@@ -72,31 +72,6 @@ public class ObjectPool<T> where T : class, new()
 }
 
 /// <summary>
-/// 游戏状态对象池
-/// </summary>
-public static class GameStatePool
-{
-    private static readonly ObjectPool<Models.GameState> _pool = new(
-        maxSize: 16,
-        factory: () => new Models.GameState(),
-        reset: state =>
-        {
-            state.CurrentHpPercent = 100;
-            state.CurrentMpPercent = 100;
-            state.HpPercentage = 1.0;
-            state.MpPercentage = 1.0;
-            state.IsGlobalCdActive = false;
-            state.IsCasting = false;
-            state.HasTarget = false;
-            state.UpdateTime = default;
-        }
-    );
-
-    public static Models.GameState Rent() => _pool.Rent();
-    public static void Return(Models.GameState state) => _pool.Return(state);
-}
-
-/// <summary>
 /// 字节数组池（用于帧哈希等）
 /// </summary>
 public static class ByteArrayPool

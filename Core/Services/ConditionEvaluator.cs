@@ -56,15 +56,19 @@ public class ConditionEvaluator
         if (!EvaluateConditionBuff(config))
             return false;
 
-        // 4. 检查状态要求（RequireState）
+        // 4. 检查排除条件Buff（ExcludeConditionBuff）
+        if (!EvaluateExcludeConditionBuff(config))
+            return false;
+
+        // 5. 检查状态要求（RequireState）
         if (!EvaluateRequireState(config, stateTracker))
             return false;
 
-        // 5. 检查MP条件（MinMp）
+        // 6. 检查MP条件（MinMp）
         if (!EvaluateMinMpCondition(config, context))
             return false;
 
-        // 6. 检查HP条件（HpCheckTarget + HpThreshold）
+        // 7. 检查HP条件（HpCheckTarget + HpThreshold）
         if (!EvaluateHpCondition(config, context))
             return false;
 
@@ -143,6 +147,20 @@ public class ConditionEvaluator
 
         // 检查Buff是否存在
         return _buffChecker.CheckBuffExists(config.ConditionBuff);
+    }
+
+    /// <summary>
+    /// 评估排除条件Buff
+    /// 当ExcludeConditionBuff存在时，技能应被跳过
+    /// </summary>
+    private bool EvaluateExcludeConditionBuff(SkillConfig config)
+    {
+        // 如果没有配置排除Buff，直接通过
+        if (string.IsNullOrEmpty(config.ExcludeConditionBuff))
+            return true;
+
+        // 检查Buff是否存在，存在则返回false（跳过技能）
+        return !_buffChecker.CheckBuffExists(config.ExcludeConditionBuff);
     }
 
     /// <summary>

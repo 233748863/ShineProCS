@@ -163,6 +163,15 @@ public partial class AppSettings : ObservableObject
     
     #endregion
     
+    #region 输入驱动配置
+    
+    /// <summary>
+    /// 输入驱动类型 (0=Win32软件模拟, 1=GhostBox硬件驱动)
+    /// </summary>
+    [ObservableProperty] private InputDriverType _inputDriverType = InputDriverType.Win32;
+    
+    #endregion
+    
     #region 高级配置
     
     /// <summary>

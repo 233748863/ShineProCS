@@ -256,6 +256,10 @@ public class ConfigManager
         else if (settings.TemplateCacheSize > 500)
             settings.TemplateCacheSize = 500;
         
+        // 验证输入驱动类型 (0=Win32, 1=GhostBox)
+        if ((int)settings.InputDriverType < 0 || (int)settings.InputDriverType > 1)
+            settings.InputDriverType = InputDriverType.Win32;
+        
         // 确保BuffLibrary已初始化
         settings.BuffLibrary ??= [];
         

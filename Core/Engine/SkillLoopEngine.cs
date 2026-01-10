@@ -21,11 +21,12 @@ public class SkillLoopEngine
 {
     #region 依赖组件
     
-    private readonly IKeyboardInterface _keyboard;
+    private IKeyboardInterface _keyboard;
     private readonly IImageInterface _image;
     private readonly ConfigManager _config;
     private readonly StateDetector _stateDetector;
     private readonly TemplatePreloader _templatePreloader;
+    private readonly object _keyboardLock = new();
     
     #endregion
     
@@ -51,6 +52,11 @@ public class SkillLoopEngine
     private CancellationTokenSource? _cts;
     private Task? _loopTask;
     private Task? _captureTask;
+    
+    // 设备断开状态
+    private bool _deviceDisconnected;
+    private DateTime _disconnectTime;
+    private const int AutoPauseTimeoutMs = 5000; // 断开超过5秒自动暂停
     
     #endregion
     
@@ -220,6 +226,59 @@ public class SkillLoopEngine
         NotifyStatus();
     }
 
+    /// <summary>
+    /// 更新键盘接口（用于运行时切换输入驱动）
+    /// </summary>
+    /// <param name="newKeyboard">新的键盘接口实例</param>
+    public void UpdateKeyboardInterface(IKeyboardInterface newKeyboard)
+    {
+        if (newKeyboard == null) throw new ArgumentNullException(nameof(newKeyboard));
+        
+        lock (_keyboardLock)
+        {
+            _keyboard = newKeyboard;
+        }
+        Log("键盘接口已更新", 1);
+    }
+    
+    /// <summary>
+    /// 处理设备断开事件
+    /// </summary>
+    public void OnDeviceDisconnected()
+    {
+        lock (_stateLock)
+        {
+            if (_deviceDisconnected) return;
+            
+            _deviceDisconnected = true;
+            _disconnectTime = DateTime.Now;
+            Log("GhostBox 设备已断开，等待重连...", 2);
+        }
+    }
+    
+    /// <summary>
+    /// 处理设备重连事件
+    /// </summary>
+    public void OnDeviceReconnected()
+    {
+        lock (_stateLock)
+        {
+            if (!_deviceDisconnected) return;
+            
+            _deviceDisconnected = false;
+            
+            // 如果之前因断开而暂停，恢复运行
+            if (_isPaused && _isRunning)
+            {
+                Log("GhostBox 设备已重连，可继续运行", 1);
+            }
+            else
+            {
+                Log("GhostBox 设备已重连", 1);
+            }
+        }
+    }
+
     public EngineStatus GetStatus()
     {
         bool isRunning, isPaused;
@@ -283,7 +342,35 @@ public class SkillLoopEngine
             try
             {
                 bool isPaused;
-                lock (_stateLock) { isPaused = _isPaused; }
+                bool deviceDisconnected;
+                DateTime disconnectTime;
+                
+                lock (_stateLock) 
+                { 
+                    isPaused = _isPaused;
+                    deviceDisconnected = _deviceDisconnected;
+                    disconnectTime = _disconnectTime;
+                }
+                
+                // 检查设备断开状态
+                if (deviceDisconnected)
+                {
+                    // 检查是否超过自动暂停超时时间
+                    if (!isPaused && (DateTime.Now - disconnectTime).TotalMilliseconds > AutoPauseTimeoutMs)
+                    {
+                        lock (_stateLock)
+                        {
+                            if (!_isPaused && _deviceDisconnected)
+                            {
+                                _isPaused = true;
+                                Log("设备断开超过5秒，引擎已自动暂停", 2);
+                                NotifyStatus();
+                            }
+                        }
+                    }
+                    Thread.Sleep(EngineConst.PauseCheckIntervalMs);
+                    continue;
+                }
                 
                 if (isPaused) { Thread.Sleep(EngineConst.PauseCheckIntervalMs); continue; }
                 if (!_imageQueue.TryTake(out currentFrame, EngineConst.ImageQueueTimeoutMs, token)) continue;
@@ -642,19 +729,29 @@ public class SkillLoopEngine
     /// </summary>
     private bool ExecuteInstantSkill(SkillRuntimeState skill)
     {
-        if (_keyboard.PressAndRelease(skill.Config.KeyCode))
+        try
         {
-            skill.MarkAsUsed();
-            skill.ConsecutiveFailures = 0;
-            _cooldownTracker.RecordSkillUse(skill.Config.Name, skill.Config.Cooldown);
-            // Requirements 6.1, 6.2, 6.3: 技能成功释放后更新状态追踪器
-            UpdateStateOnSkillCast(skill.Config);
-            Log($"释放: {skill.Config.Name} [瞬发]", 0);
-            return true;
+            if (_keyboard.PressAndRelease(skill.Config.KeyCode))
+            {
+                skill.MarkAsUsed();
+                skill.ConsecutiveFailures = 0;
+                _cooldownTracker.RecordSkillUse(skill.Config.Name, skill.Config.Cooldown);
+                // Requirements 6.1, 6.2, 6.3: 技能成功释放后更新状态追踪器
+                UpdateStateOnSkillCast(skill.Config);
+                Log($"释放: {skill.Config.Name} [瞬发]", 0);
+                return true;
+            }
+            
+            skill.ConsecutiveFailures++;
+            return false;
         }
-        
-        skill.ConsecutiveFailures++;
-        return false;
+        catch (Exception ex)
+        {
+            // 设备断开时捕获异常，记录日志但不崩溃
+            Log($"技能 {skill.Config.Name} 释放失败（设备可能已断开）: {ex.Message}", 2);
+            skill.ConsecutiveFailures++;
+            return false;
+        }
     }
     
     /// <summary>
@@ -664,38 +761,48 @@ public class SkillLoopEngine
     {
         var config = skill.Config;
         
-        if (_keyboard.PressAndRelease(config.KeyCode))
+        try
         {
-            skill.MarkAsUsed();
-            skill.ConsecutiveFailures = 0;
-            _cooldownTracker.RecordSkillUse(config.Name, config.Cooldown);
-            // Requirements 6.1, 6.2, 6.3: 技能成功释放后更新状态追踪器
-            UpdateStateOnSkillCast(config);
-            
-            var maxCastTime = config.CastDuration;
-            
-            if (config.UseCastEndDetection)
+            if (_keyboard.PressAndRelease(config.KeyCode))
             {
-                // 使用视觉检测判断读条结束
-                Log($"释放: {config.Name} [读条, 视觉检测结束]", 0);
-                WaitForCastEnd(config, maxCastTime);
-            }
-            else if (maxCastTime > 0)
-            {
-                // 固定时间等待
-                Log($"释放: {config.Name} [读条 {maxCastTime}ms]", 0);
-                Thread.Sleep(maxCastTime);
-            }
-            else
-            {
-                Log($"释放: {config.Name} [读条]", 0);
+                skill.MarkAsUsed();
+                skill.ConsecutiveFailures = 0;
+                _cooldownTracker.RecordSkillUse(config.Name, config.Cooldown);
+                // Requirements 6.1, 6.2, 6.3: 技能成功释放后更新状态追踪器
+                UpdateStateOnSkillCast(config);
+                
+                var maxCastTime = config.CastDuration;
+                
+                if (config.UseCastEndDetection)
+                {
+                    // 使用视觉检测判断读条结束
+                    Log($"释放: {config.Name} [读条, 视觉检测结束]", 0);
+                    WaitForCastEnd(config, maxCastTime);
+                }
+                else if (maxCastTime > 0)
+                {
+                    // 固定时间等待
+                    Log($"释放: {config.Name} [读条 {maxCastTime}ms]", 0);
+                    Thread.Sleep(maxCastTime);
+                }
+                else
+                {
+                    Log($"释放: {config.Name} [读条]", 0);
+                }
+                
+                return true;
             }
             
-            return true;
+            skill.ConsecutiveFailures++;
+            return false;
         }
-        
-        skill.ConsecutiveFailures++;
-        return false;
+        catch (Exception ex)
+        {
+            // 设备断开时捕获异常，记录日志但不崩溃
+            Log($"技能 {config.Name} 释放失败（设备可能已断开）: {ex.Message}", 2);
+            skill.ConsecutiveFailures++;
+            return false;
+        }
     }
     
     /// <summary>

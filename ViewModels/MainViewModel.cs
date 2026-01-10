@@ -35,6 +35,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private readonly SkillLoopEngine _engine;
     private readonly IImageInterface _imageInterface;
     private readonly GlobalHotkeyService _hotkeyService;
+    private readonly InputDriverManager _inputDriverManager;
     
     /// <summary>
     /// 公开图像接口供其他组件使用（如SkillConfigPage）
@@ -71,6 +72,198 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private ObservableCollection<SkillStatusItem> _skillStatusList = [];
     [ObservableProperty] private bool _showGuideTip;
     [ObservableProperty] private string _hotkeyStatus = "";
+    
+    #region 窗口选择器相关属性
+    
+    private readonly IWindowEnumerationService _windowEnumerationService;
+    
+    /// <summary>
+    /// 可用窗口列表
+    /// </summary>
+    [ObservableProperty] 
+    private ObservableCollection<WindowInfo> _windowList = [];
+    
+    /// <summary>
+    /// 当前选中的窗口
+    /// </summary>
+    [ObservableProperty] 
+    private WindowInfo? _selectedWindow;
+    
+    /// <summary>
+    /// 是否正在刷新窗口列表
+    /// </summary>
+    [ObservableProperty] 
+    private bool _isRefreshingWindows;
+    
+    /// <summary>
+    /// 窗口选择变化时更新配置
+    /// </summary>
+    partial void OnSelectedWindowChanged(WindowInfo? value)
+    {
+        if (value != null)
+        {
+            AppSettings.GameWindowTitle = value.Title;
+            OnLog($"已选择窗口: {value.DisplayText}", 1);
+        }
+    }
+    
+    /// <summary>
+    /// 初始化窗口列表并尝试匹配保存的窗口
+    /// </summary>
+    private void InitializeWindowList()
+    {
+        try
+        {
+            var windows = _windowEnumerationService.GetVisibleWindows();
+            WindowList.Clear();
+            foreach (var window in windows)
+            {
+                WindowList.Add(window);
+            }
+            
+            // 尝试匹配保存的窗口标题
+            var savedTitle = AppSettings.GameWindowTitle;
+            if (!string.IsNullOrEmpty(savedTitle))
+            {
+                var matchedWindow = _windowEnumerationService.FindWindowByTitle(savedTitle);
+                if (matchedWindow != null)
+                {
+                    // 在列表中找到对应的窗口并选中
+                    SelectedWindow = WindowList.FirstOrDefault(w => w.Handle == matchedWindow.Handle);
+                    if (SelectedWindow != null)
+                    {
+                        OnLog($"已自动匹配窗口: {SelectedWindow.DisplayText}", 1);
+                    }
+                }
+                else
+                {
+                    OnLog($"未找到保存的窗口: {savedTitle}", 2);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            OnLog($"初始化窗口列表失败: {ex.Message}", 2);
+        }
+    }
+    
+    /// <summary>
+    /// 刷新窗口列表命令
+    /// </summary>
+    [RelayCommand]
+    private async Task RefreshWindowListAsync()
+    {
+        IsRefreshingWindows = true;
+        try
+        {
+            // 保存当前选择的窗口标题
+            var currentSelection = SelectedWindow?.Title;
+            
+            // 异步获取窗口列表
+            var windows = await Task.Run(() => _windowEnumerationService.GetVisibleWindows());
+            
+            // 更新列表
+            WindowList.Clear();
+            foreach (var window in windows)
+            {
+                WindowList.Add(window);
+            }
+            
+            // 尝试恢复之前的选择
+            if (!string.IsNullOrEmpty(currentSelection))
+            {
+                SelectedWindow = WindowList.FirstOrDefault(w => w.Title == currentSelection);
+                if (SelectedWindow != null)
+                {
+                    OnLog($"已恢复窗口选择: {SelectedWindow.DisplayText}", 1);
+                }
+            }
+            
+            OnLog($"窗口列表已刷新，共 {WindowList.Count} 个窗口", 1);
+        }
+        catch (Exception ex)
+        {
+            OnLog($"刷新窗口列表失败: {ex.Message}", 2);
+            ToastManager.Error($"刷新失败: {ex.Message}", "窗口列表");
+        }
+        finally
+        {
+            IsRefreshingWindows = false;
+        }
+    }
+    
+    #endregion
+    
+    #region 输入驱动相关属性
+    
+    /// <summary>
+    /// 当前选择的驱动索引 (0=Win32, 1=GhostBox)
+    /// </summary>
+    public int SelectedDriverIndex
+    {
+        get => (int)_inputDriverManager.CurrentDriverType;
+        set
+        {
+            if (value != (int)_inputDriverManager.CurrentDriverType)
+            {
+                SwitchInputDriver((InputDriverType)value);
+            }
+        }
+    }
+    
+    /// <summary>
+    /// GhostBox 是否可用
+    /// </summary>
+    public bool IsGhostBoxAvailable => _inputDriverManager.IsGhostBoxAvailable;
+    
+    /// <summary>
+    /// 是否选择了 GhostBox 驱动
+    /// </summary>
+    public bool IsGhostBoxSelected => _inputDriverManager.CurrentDriverType == InputDriverType.GhostBox;
+    
+    /// <summary>
+    /// GhostBox 是否已连接
+    /// </summary>
+    public bool IsGhostBoxConnected => _inputDriverManager.IsGhostBoxConnected;
+    
+    /// <summary>
+    /// GhostBox 连接状态文本
+    /// </summary>
+    public string GhostBoxConnectionStatus => _inputDriverManager.GhostBoxStatus;
+    
+    /// <summary>
+    /// GhostBox 连接状态颜色
+    /// </summary>
+    [ObservableProperty]
+    private string _ghostBoxConnectionStatusColor = "Gray";
+    
+    /// <summary>
+    /// GhostBox 设备信息
+    /// </summary>
+    public string GhostBoxDeviceInfo
+    {
+        get
+        {
+            if (!_inputDriverManager.IsGhostBoxConnected) return "";
+            var model = _inputDriverManager.GhostBoxDeviceModel;
+            var serial = _inputDriverManager.GhostBoxSerialNumber;
+            if (!string.IsNullOrEmpty(model) || !string.IsNullOrEmpty(serial))
+                return $"型号: {model}, 序列号: {serial}";
+            return "设备已连接";
+        }
+    }
+    
+    /// <summary>
+    /// GhostBox 错误信息
+    /// </summary>
+    public string GhostBoxErrorMessage => _inputDriverManager.GhostBoxLastError;
+    
+    /// <summary>
+    /// 是否有 GhostBox 错误
+    /// </summary>
+    public bool HasGhostBoxError => !string.IsNullOrEmpty(_inputDriverManager.GhostBoxLastError);
+    
+    #endregion
 
     public MainViewModel()
     {
@@ -78,7 +271,17 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _config.LoadConfigs();
         AppSettings = _config.AppSettings;
 
-        IKeyboardInterface keyboard = new Win32KeyboardInterface();
+        // 初始化输入驱动管理器，使用配置中保存的驱动类型
+        _inputDriverManager = new InputDriverManager(AppSettings.InputDriverType);
+        _inputDriverManager.DriverChanged += OnDriverChanged;
+        _inputDriverManager.ConnectionStatusChanged += OnConnectionStatusChanged;
+        _inputDriverManager.DeviceConnectionChanged += OnDeviceConnectionChanged;
+        
+        // 初始化窗口枚举服务
+        _windowEnumerationService = new WindowEnumerationService();
+        
+        // 使用驱动管理器提供的键盘接口
+        IKeyboardInterface keyboard = _inputDriverManager.KeyboardInterface;
         _imageInterface = new OpenCvImageInterface();
         _engine = new SkillLoopEngine(keyboard, _imageInterface, _config);
         _engine.StatusChanged += OnStatusChanged;
@@ -89,6 +292,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
         
         _hotkeyService = new GlobalHotkeyService();
         _hotkeyService.HotkeyTriggered += OnHotkeyTriggered;
+        
+        // 订阅配置变更事件，确保技能状态列表同步更新
+        _config.ConfigChanged += OnConfigChangedHandler;
 
         LoadSkills();
         RefreshProfiles();
@@ -96,6 +302,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
         StartMemoryMonitor();
         StartCooldownTimer();
         CheckFirstTimeGuide();
+        
+        // 初始化窗口列表并尝试匹配保存的窗口
+        InitializeWindowList();
         
         if (AppSettings.EnableOverlay)
             ShowOverlay();
@@ -273,6 +482,28 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
     }
 
+    /// <summary>
+    /// 配置变更处理，确保技能状态列表与配置同步
+    /// </summary>
+    private void OnConfigChangedHandler(string filePath)
+    {
+        // 只处理技能配置文件的变更
+        if (!filePath.Contains("skills.json")) return;
+        
+        System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+        {
+            // 重新加载技能配置到UI
+            Skills = new ObservableCollection<SkillConfig>(_config.Skills);
+            if (Skills.Count > 0 && SelectedSkill == null) 
+                SelectedSkill = Skills[0];
+            
+            // 重新初始化技能状态列表
+            InitializeSkillStatusList();
+            
+            OnLog("技能状态列表已同步更新", 0);
+        });
+    }
+
     private void RefreshProfiles() => AvailableProfiles = new ObservableCollection<string>(_config.GetAvailableProfiles());
 
     private void OnStatusChanged(EngineStatus s)
@@ -383,10 +614,80 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _engine.Stop();
         HideOverlay();
         
+        // 取消订阅配置变更事件
+        _config.ConfigChanged -= OnConfigChangedHandler;
+        
+        // 释放输入驱动管理器
+        _inputDriverManager.DriverChanged -= OnDriverChanged;
+        _inputDriverManager.ConnectionStatusChanged -= OnConnectionStatusChanged;
+        _inputDriverManager.DeviceConnectionChanged -= OnDeviceConnectionChanged;
+        _inputDriverManager.Dispose();
+        
         GC.SuppressFinalize(this);
     }
 
-    [RelayCommand] private void StartEngine() => _engine.Start();
+    /// <summary>
+    /// 启动引擎，启动前验证选中窗口是否存在
+    /// </summary>
+    [RelayCommand] 
+    private void StartEngine()
+    {
+        // 验证选中窗口是否存在
+        if (!ValidateSelectedWindow())
+        {
+            return;
+        }
+        
+        _engine.Start();
+    }
+    
+    /// <summary>
+    /// 验证选中的窗口是否仍然存在
+    /// </summary>
+    /// <returns>窗口有效返回true，无效返回false</returns>
+    private bool ValidateSelectedWindow()
+    {
+        // 如果没有选中窗口，检查是否有保存的窗口标题
+        if (SelectedWindow == null)
+        {
+            if (string.IsNullOrEmpty(AppSettings.GameWindowTitle))
+            {
+                ToastManager.Warning("请先选择目标窗口", "启动失败");
+                OnLog("引擎启动失败: 未选择目标窗口", 2);
+                return false;
+            }
+            
+            // 尝试根据保存的标题查找窗口
+            var window = _windowEnumerationService.FindWindowByTitle(AppSettings.GameWindowTitle);
+            if (window == null)
+            {
+                ToastManager.Warning($"目标窗口 \"{AppSettings.GameWindowTitle}\" 不存在，请重新选择", "启动失败");
+                OnLog($"引擎启动失败: 目标窗口 \"{AppSettings.GameWindowTitle}\" 不存在", 2);
+                return false;
+            }
+            
+            // 找到窗口，更新选择
+            SelectedWindow = WindowList.FirstOrDefault(w => w.Handle == window.Handle);
+            if (SelectedWindow == null)
+            {
+                // 窗口不在列表中，刷新列表
+                _ = RefreshWindowListAsync();
+                SelectedWindow = WindowList.FirstOrDefault(w => w.Handle == window.Handle);
+            }
+        }
+        
+        // 验证选中窗口是否仍然有效
+        if (SelectedWindow != null && !_windowEnumerationService.IsWindowValid(SelectedWindow.Handle))
+        {
+            ToastManager.Warning($"目标窗口 \"{SelectedWindow.Title}\" 已关闭，请重新选择", "启动失败");
+            OnLog($"引擎启动失败: 目标窗口 \"{SelectedWindow.Title}\" 已关闭", 2);
+            SelectedWindow = null;
+            return false;
+        }
+        
+        return true;
+    }
+    
     [RelayCommand] private void StopEngine() => _engine.Stop();
     [RelayCommand] private void PauseEngine() => _engine.TogglePause();
     
@@ -1634,4 +1935,150 @@ public partial class MainViewModel : ObservableObject, IDisposable
         OnLog($"已删除技能组: {groupName}", 1);
         ToastManager.Info($"已删除技能组: {groupName}", "技能组");
     }
+    
+    #region 输入驱动相关方法
+    
+    /// <summary>
+    /// 切换输入驱动
+    /// </summary>
+    private void SwitchInputDriver(InputDriverType driverType)
+    {
+        var oldType = _inputDriverManager.CurrentDriverType;
+        bool success = _inputDriverManager.SwitchDriver(driverType);
+        
+        if (success)
+        {
+            // 更新配置
+            AppSettings.InputDriverType = driverType;
+            _config.SaveAppSettings();
+            
+            // 更新引擎使用的键盘接口
+            _engine.UpdateKeyboardInterface(_inputDriverManager.KeyboardInterface);
+            
+            OnLog($"输入驱动已切换: {oldType} -> {driverType}", 1);
+            ToastManager.Success($"已切换到 {GetDriverDisplayName(driverType)}", "驱动切换");
+        }
+        else
+        {
+            OnLog($"输入驱动切换失败: {_inputDriverManager.GhostBoxLastError}", 2);
+            ToastManager.Error($"切换失败: {_inputDriverManager.GhostBoxLastError}", "驱动切换");
+        }
+        
+        // 通知 UI 更新
+        NotifyDriverPropertiesChanged();
+    }
+    
+    /// <summary>
+    /// 重新连接 GhostBox 设备
+    /// </summary>
+    [RelayCommand]
+    private void ReconnectGhostBox()
+    {
+        OnLog("正在重新连接 GhostBox 设备...", 1);
+        
+        bool success = _inputDriverManager.ReconnectGhostBox();
+        
+        if (success)
+        {
+            // 如果当前选择的是 GhostBox 驱动，更新引擎的键盘接口
+            if (_inputDriverManager.CurrentDriverType == InputDriverType.GhostBox)
+            {
+                _engine.UpdateKeyboardInterface(_inputDriverManager.KeyboardInterface);
+            }
+            
+            OnLog("GhostBox 设备重新连接成功", 1);
+            ToastManager.Success("设备已连接", "GhostBox");
+        }
+        else
+        {
+            OnLog($"GhostBox 设备重新连接失败: {_inputDriverManager.GhostBoxLastError}", 2);
+            ToastManager.Error($"连接失败: {_inputDriverManager.GhostBoxLastError}", "GhostBox");
+        }
+        
+        NotifyDriverPropertiesChanged();
+    }
+    
+    /// <summary>
+    /// 驱动切换事件处理
+    /// </summary>
+    private void OnDriverChanged(object? sender, DriverChangedEventArgs e)
+    {
+        System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+        {
+            NotifyDriverPropertiesChanged();
+        });
+    }
+    
+    /// <summary>
+    /// 连接状态变化事件处理
+    /// </summary>
+    private void OnConnectionStatusChanged(object? sender, string status)
+    {
+        System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+        {
+            OnLog($"GhostBox 状态: {status}", 1);
+            NotifyDriverPropertiesChanged();
+        });
+    }
+    
+    /// <summary>
+    /// 设备连接状态变化事件处理（来自 ConnectionMonitor）
+    /// </summary>
+    private void OnDeviceConnectionChanged(object? sender, ConnectionStateChangedEventArgs e)
+    {
+        System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+        {
+            // 更新 UI 绑定属性
+            OnPropertyChanged(nameof(IsGhostBoxConnected));
+            OnPropertyChanged(nameof(GhostBoxConnectionStatus));
+            OnPropertyChanged(nameof(GhostBoxDeviceInfo));
+            
+            // 更新状态颜色
+            GhostBoxConnectionStatusColor = e.IsConnected ? "Green" : "Red";
+            
+            // 通知引擎设备状态变化
+            if (e.IsConnected)
+            {
+                _engine.OnDeviceReconnected();
+                ToastManager.Success("GhostBox 设备已连接", "设备状态");
+            }
+            else
+            {
+                _engine.OnDeviceDisconnected();
+                ToastManager.Warning("GhostBox 设备已断开，正在尝试重连...", "设备状态");
+            }
+            
+            OnLog(e.Message, e.IsConnected ? 1 : 2);
+        });
+    }
+    
+    /// <summary>
+    /// 通知驱动相关属性变化
+    /// </summary>
+    private void NotifyDriverPropertiesChanged()
+    {
+        OnPropertyChanged(nameof(SelectedDriverIndex));
+        OnPropertyChanged(nameof(IsGhostBoxAvailable));
+        OnPropertyChanged(nameof(IsGhostBoxSelected));
+        OnPropertyChanged(nameof(IsGhostBoxConnected));
+        OnPropertyChanged(nameof(GhostBoxConnectionStatus));
+        OnPropertyChanged(nameof(GhostBoxDeviceInfo));
+        OnPropertyChanged(nameof(GhostBoxErrorMessage));
+        OnPropertyChanged(nameof(HasGhostBoxError));
+    }
+    
+    /// <summary>
+    /// 获取驱动显示名称
+    /// </summary>
+    private static string GetDriverDisplayName(InputDriverType driverType)
+    {
+        return driverType switch
+        {
+            InputDriverType.Win32 => "Win32 (软件模拟)",
+            InputDriverType.GhostBox => "GhostBox (硬件驱动)",
+            _ => driverType.ToString()
+        };
+    }
+    
+    #endregion
 }

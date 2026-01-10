@@ -5,65 +5,6 @@ using System.Windows.Media;
 namespace ShineProCS.Utils;
 
 /// <summary>
-/// 日志消息模型
-/// </summary>
-public class LogMessage
-{
-    public string Text { get; set; } = "";
-    public int Level { get; set; } // 0=调试, 1=信息, 2=警告, 3=错误
-    public DateTime Time { get; set; } = DateTime.Now;
-    
-    public string FormattedText => $"[{Time:HH:mm:ss}] {Text}";
-}
-
-/// <summary>
-/// 日志级别到颜色的转换器
-/// </summary>
-public class LogLevelColorConverter : IValueConverter
-{
-    private static readonly SolidColorBrush DebugBrush = new(System.Windows.Media.Color.FromRgb(128, 128, 128));
-    private static readonly SolidColorBrush InfoBrush = new(System.Windows.Media.Color.FromRgb(200, 200, 200));
-    private static readonly SolidColorBrush WarnBrush = new(System.Windows.Media.Color.FromRgb(255, 193, 7));
-    private static readonly SolidColorBrush ErrorBrush = new(System.Windows.Media.Color.FromRgb(244, 67, 54));
-    private static readonly SolidColorBrush SuccessBrush = new(System.Windows.Media.Color.FromRgb(76, 175, 80));
-
-    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
-    {
-        if (value is int level)
-        {
-            return level switch
-            {
-                0 => DebugBrush,
-                1 => InfoBrush,
-                2 => WarnBrush,
-                3 => ErrorBrush,
-                _ => InfoBrush
-            };
-        }
-        
-        // 如果是字符串，根据内容判断
-        if (value is string text)
-        {
-            if (text.Contains("错误") || text.Contains("失败") || text.Contains("异常"))
-                return ErrorBrush;
-            if (text.Contains("警告") || text.Contains("CD中"))
-                return WarnBrush;
-            if (text.Contains("释放:") || text.Contains("成功") || text.Contains("已启动"))
-                return SuccessBrush;
-            if (text.Contains("检测") || text.Contains("等待"))
-                return DebugBrush;
-        }
-        
-        return InfoBrush;
-    }
-
-    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
-    {
-        throw new NotImplementedException();
-    }
-}
-
-/// <summary>
 /// 日志文本到颜色的转换器（根据文本内容判断）
 /// </summary>
 public class LogTextColorConverter : IValueConverter

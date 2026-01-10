@@ -39,23 +39,106 @@ public partial class SkillCardControl : System.Windows.Controls.UserControl
             _configManager = mainWindow.GetConfigManager();
             RefreshBuffComboBox();
             RefreshConditionBuffComboBox();
+            RefreshExcludeConditionBuffComboBox();
             RefreshPriorityOverrideConditionComboBox();
             RefreshSkillGroupComboBox();
             RefreshPreCastSkillNameComboBox();
+            ValidateReferences(); // 加载后验证引用
         }
         
         // 确保施法类型UI正确显示
         UpdateCastTypeUI();
     }
     
+    #region 引用验证方法
+    
+    /// <summary>
+    /// 检查技能组引用是否有效
+    /// </summary>
+    private bool IsValidSkillGroup(string groupName)
+    {
+        if (string.IsNullOrEmpty(groupName)) return true;
+        if (_configManager == null) return false;
+        return _configManager.AppSettings.SkillGroups
+            .Any(g => g.Enabled && g.Name == groupName);
+    }
+    
+    /// <summary>
+    /// 检查Buff引用是否有效
+    /// </summary>
+    private bool IsValidBuff(string buffName)
+    {
+        if (string.IsNullOrEmpty(buffName)) return true;
+        if (_configManager == null) return false;
+        return _configManager.AppSettings.BuffLibrary
+            .Any(b => b.Enabled && b.Name == buffName);
+    }
+    
+    /// <summary>
+    /// 检查前置技能引用是否有效
+    /// </summary>
+    private bool IsValidPreCastSkill(string skillName)
+    {
+        if (string.IsNullOrEmpty(skillName)) return true;
+        if (_configManager == null) return false;
+        return _configManager.Skills
+            .Any(s => s.Enabled && s.Name == skillName && s != Skill);
+    }
+    
+    /// <summary>
+    /// 验证当前技能的所有引用，更新警告图标
+    /// </summary>
+    private void ValidateReferences()
+    {
+        if (Skill == null) return;
+        
+        // 验证技能组
+        var skillGroupValid = IsValidSkillGroup(Skill.SkillGroup);
+        SkillGroupWarning.Visibility = skillGroupValid ? Visibility.Collapsed : Visibility.Visible;
+        if (!skillGroupValid)
+            SkillGroupWarning.ToolTip = $"技能组 \"{Skill.SkillGroup}\" 不存在或已禁用";
+        
+        // 验证条件Buff
+        var conditionBuffValid = IsValidBuff(Skill.ConditionBuff);
+        ConditionBuffWarning.Visibility = conditionBuffValid ? Visibility.Collapsed : Visibility.Visible;
+        if (!conditionBuffValid)
+            ConditionBuffWarning.ToolTip = $"Buff \"{Skill.ConditionBuff}\" 不存在或已禁用";
+        
+        // 验证排除条件Buff
+        var excludeConditionBuffValid = IsValidBuff(Skill.ExcludeConditionBuff);
+        ExcludeConditionBuffWarning.Visibility = excludeConditionBuffValid ? Visibility.Collapsed : Visibility.Visible;
+        if (!excludeConditionBuffValid)
+            ExcludeConditionBuffWarning.ToolTip = $"Buff \"{Skill.ExcludeConditionBuff}\" 不存在或已禁用";
+        
+        // 验证优先级覆盖条件Buff
+        var priorityOverrideValid = IsValidBuff(Skill.PriorityOverrideCondition);
+        PriorityOverrideConditionWarning.Visibility = priorityOverrideValid ? Visibility.Collapsed : Visibility.Visible;
+        if (!priorityOverrideValid)
+            PriorityOverrideConditionWarning.ToolTip = $"Buff \"{Skill.PriorityOverrideCondition}\" 不存在或已禁用";
+        
+        // 验证前置技能
+        var preCastSkillValid = IsValidPreCastSkill(Skill.PreCastSkillName);
+        PreCastSkillNameWarning.Visibility = preCastSkillValid ? Visibility.Collapsed : Visibility.Visible;
+        if (!preCastSkillValid)
+            PreCastSkillNameWarning.ToolTip = $"技能 \"{Skill.PreCastSkillName}\" 不存在或已禁用";
+        
+        // 验证触发条件Buff
+        var preCastConditionBuffValid = IsValidBuff(Skill.PreCastConditionBuff);
+        BuffWarning.Visibility = preCastConditionBuffValid ? Visibility.Collapsed : Visibility.Visible;
+        if (!preCastConditionBuffValid)
+            BuffWarning.ToolTip = $"Buff \"{Skill.PreCastConditionBuff}\" 不存在或已禁用";
+    }
+    
+    #endregion
+    
     /// <summary>
     /// 刷新Buff下拉列表
     /// </summary>
     public void RefreshBuffComboBox()
     {
-        if (_configManager == null) return;
+        if (_configManager == null || Skill == null) return;
         
-        var currentValue = BuffComboBox.Text;
+        var currentValue = Skill.PreCastConditionBuff;
         BuffComboBox.Items.Clear();
         
         // 添加空选项
@@ -67,8 +150,25 @@ public partial class SkillCardControl : System.Windows.Controls.UserControl
             BuffComboBox.Items.Add(buff.Name);
         }
         
-        // 恢复当前值
-        BuffComboBox.Text = currentValue;
+        // 如果当前值无效但非空，添加到列表中（带警告标记）
+        if (!string.IsNullOrEmpty(currentValue) && !IsValidBuff(currentValue))
+        {
+            BuffComboBox.Items.Add($"⚠ {currentValue}");
+        }
+        
+        // 设置选中项
+        if (string.IsNullOrEmpty(currentValue))
+        {
+            BuffComboBox.SelectedIndex = 0;
+        }
+        else if (IsValidBuff(currentValue))
+        {
+            BuffComboBox.SelectedItem = currentValue;
+        }
+        else
+        {
+            BuffComboBox.SelectedItem = $"⚠ {currentValue}";
+        }
     }
     
     /// <summary>
@@ -76,9 +176,9 @@ public partial class SkillCardControl : System.Windows.Controls.UserControl
     /// </summary>
     public void RefreshConditionBuffComboBox()
     {
-        if (_configManager == null) return;
+        if (_configManager == null || Skill == null) return;
         
-        var currentValue = ConditionBuffComboBox.Text;
+        var currentValue = Skill.ConditionBuff;
         ConditionBuffComboBox.Items.Clear();
         
         // 添加空选项
@@ -90,8 +190,65 @@ public partial class SkillCardControl : System.Windows.Controls.UserControl
             ConditionBuffComboBox.Items.Add(buff.Name);
         }
         
-        // 恢复当前值
-        ConditionBuffComboBox.Text = currentValue;
+        // 如果当前值无效但非空，添加到列表中
+        if (!string.IsNullOrEmpty(currentValue) && !IsValidBuff(currentValue))
+        {
+            ConditionBuffComboBox.Items.Add($"⚠ {currentValue}");
+        }
+        
+        // 设置选中项
+        if (string.IsNullOrEmpty(currentValue))
+        {
+            ConditionBuffComboBox.SelectedIndex = 0;
+        }
+        else if (IsValidBuff(currentValue))
+        {
+            ConditionBuffComboBox.SelectedItem = currentValue;
+        }
+        else
+        {
+            ConditionBuffComboBox.SelectedItem = $"⚠ {currentValue}";
+        }
+    }
+    
+    /// <summary>
+    /// 刷新排除条件Buff下拉列表
+    /// </summary>
+    public void RefreshExcludeConditionBuffComboBox()
+    {
+        if (_configManager == null || Skill == null) return;
+        
+        var currentValue = Skill.ExcludeConditionBuff;
+        ExcludeConditionBuffComboBox.Items.Clear();
+        
+        // 添加空选项
+        ExcludeConditionBuffComboBox.Items.Add("");
+        
+        // 从Buff库加载
+        foreach (var buff in _configManager.AppSettings.BuffLibrary.Where(b => b.Enabled))
+        {
+            ExcludeConditionBuffComboBox.Items.Add(buff.Name);
+        }
+        
+        // 如果当前值无效但非空，添加到列表中
+        if (!string.IsNullOrEmpty(currentValue) && !IsValidBuff(currentValue))
+        {
+            ExcludeConditionBuffComboBox.Items.Add($"⚠ {currentValue}");
+        }
+        
+        // 设置选中项
+        if (string.IsNullOrEmpty(currentValue))
+        {
+            ExcludeConditionBuffComboBox.SelectedIndex = 0;
+        }
+        else if (IsValidBuff(currentValue))
+        {
+            ExcludeConditionBuffComboBox.SelectedItem = currentValue;
+        }
+        else
+        {
+            ExcludeConditionBuffComboBox.SelectedItem = $"⚠ {currentValue}";
+        }
     }
     
     /// <summary>
@@ -99,9 +256,9 @@ public partial class SkillCardControl : System.Windows.Controls.UserControl
     /// </summary>
     public void RefreshPriorityOverrideConditionComboBox()
     {
-        if (_configManager == null) return;
+        if (_configManager == null || Skill == null) return;
         
-        var currentValue = PriorityOverrideConditionComboBox.Text;
+        var currentValue = Skill.PriorityOverrideCondition;
         PriorityOverrideConditionComboBox.Items.Clear();
         
         // 添加空选项
@@ -113,8 +270,25 @@ public partial class SkillCardControl : System.Windows.Controls.UserControl
             PriorityOverrideConditionComboBox.Items.Add(buff.Name);
         }
         
-        // 恢复当前值
-        PriorityOverrideConditionComboBox.Text = currentValue;
+        // 如果当前值无效但非空，添加到列表中
+        if (!string.IsNullOrEmpty(currentValue) && !IsValidBuff(currentValue))
+        {
+            PriorityOverrideConditionComboBox.Items.Add($"⚠ {currentValue}");
+        }
+        
+        // 设置选中项
+        if (string.IsNullOrEmpty(currentValue))
+        {
+            PriorityOverrideConditionComboBox.SelectedIndex = 0;
+        }
+        else if (IsValidBuff(currentValue))
+        {
+            PriorityOverrideConditionComboBox.SelectedItem = currentValue;
+        }
+        else
+        {
+            PriorityOverrideConditionComboBox.SelectedItem = $"⚠ {currentValue}";
+        }
     }
     
     /// <summary>
@@ -122,9 +296,9 @@ public partial class SkillCardControl : System.Windows.Controls.UserControl
     /// </summary>
     public void RefreshSkillGroupComboBox()
     {
-        if (_configManager == null) return;
+        if (_configManager == null || Skill == null) return;
         
-        var currentValue = SkillGroupComboBox.Text;
+        var currentValue = Skill.SkillGroup;
         SkillGroupComboBox.Items.Clear();
         
         // 添加空选项
@@ -136,8 +310,25 @@ public partial class SkillCardControl : System.Windows.Controls.UserControl
             SkillGroupComboBox.Items.Add(group.Name);
         }
         
-        // 恢复当前值
-        SkillGroupComboBox.Text = currentValue;
+        // 如果当前值无效但非空，添加到列表中
+        if (!string.IsNullOrEmpty(currentValue) && !IsValidSkillGroup(currentValue))
+        {
+            SkillGroupComboBox.Items.Add($"⚠ {currentValue}");
+        }
+        
+        // 设置选中项
+        if (string.IsNullOrEmpty(currentValue))
+        {
+            SkillGroupComboBox.SelectedIndex = 0;
+        }
+        else if (IsValidSkillGroup(currentValue))
+        {
+            SkillGroupComboBox.SelectedItem = currentValue;
+        }
+        else
+        {
+            SkillGroupComboBox.SelectedItem = $"⚠ {currentValue}";
+        }
     }
     
     /// <summary>
@@ -145,9 +336,9 @@ public partial class SkillCardControl : System.Windows.Controls.UserControl
     /// </summary>
     public void RefreshPreCastSkillNameComboBox()
     {
-        if (_configManager == null) return;
+        if (_configManager == null || Skill == null) return;
         
-        var currentValue = PreCastSkillNameComboBox.Text;
+        var currentValue = Skill.PreCastSkillName;
         PreCastSkillNameComboBox.Items.Clear();
         
         // 添加空选项
@@ -159,8 +350,25 @@ public partial class SkillCardControl : System.Windows.Controls.UserControl
             PreCastSkillNameComboBox.Items.Add(skill.Name);
         }
         
-        // 恢复当前值
-        PreCastSkillNameComboBox.Text = currentValue;
+        // 如果当前值无效但非空，添加到列表中
+        if (!string.IsNullOrEmpty(currentValue) && !IsValidPreCastSkill(currentValue))
+        {
+            PreCastSkillNameComboBox.Items.Add($"⚠ {currentValue}");
+        }
+        
+        // 设置选中项
+        if (string.IsNullOrEmpty(currentValue))
+        {
+            PreCastSkillNameComboBox.SelectedIndex = 0;
+        }
+        else if (IsValidPreCastSkill(currentValue))
+        {
+            PreCastSkillNameComboBox.SelectedItem = currentValue;
+        }
+        else
+        {
+            PreCastSkillNameComboBox.SelectedItem = $"⚠ {currentValue}";
+        }
     }
 
     private SkillConfig? Skill => DataContext as SkillConfig;
@@ -307,11 +515,15 @@ public partial class SkillCardControl : System.Windows.Controls.UserControl
     {
         if (Skill == null) return;
         
-        var selectedBuff = BuffComboBox.SelectedItem?.ToString() ?? BuffComboBox.Text;
+        var selectedItem = BuffComboBox.SelectedItem?.ToString() ?? "";
+        // 移除警告前缀
+        var selectedBuff = selectedItem.StartsWith("⚠ ") ? selectedItem[2..] : selectedItem;
+        
         if (Skill.PreCastConditionBuff != selectedBuff)
         {
             Skill.PreCastConditionBuff = selectedBuff;
             ConfigChanged?.Invoke();
+            ValidateReferences();
         }
     }
     
@@ -322,11 +534,32 @@ public partial class SkillCardControl : System.Windows.Controls.UserControl
     {
         if (Skill == null) return;
         
-        var selectedBuff = ConditionBuffComboBox.SelectedItem?.ToString() ?? ConditionBuffComboBox.Text;
+        var selectedItem = ConditionBuffComboBox.SelectedItem?.ToString() ?? "";
+        var selectedBuff = selectedItem.StartsWith("⚠ ") ? selectedItem[2..] : selectedItem;
+        
         if (Skill.ConditionBuff != selectedBuff)
         {
             Skill.ConditionBuff = selectedBuff;
             ConfigChanged?.Invoke();
+            ValidateReferences();
+        }
+    }
+    
+    /// <summary>
+    /// 排除条件Buff下拉框选择变更
+    /// </summary>
+    private void ExcludeConditionBuffComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (Skill == null) return;
+        
+        var selectedItem = ExcludeConditionBuffComboBox.SelectedItem?.ToString() ?? "";
+        var selectedBuff = selectedItem.StartsWith("⚠ ") ? selectedItem[2..] : selectedItem;
+        
+        if (Skill.ExcludeConditionBuff != selectedBuff)
+        {
+            Skill.ExcludeConditionBuff = selectedBuff;
+            ConfigChanged?.Invoke();
+            ValidateReferences();
         }
     }
     
@@ -337,11 +570,14 @@ public partial class SkillCardControl : System.Windows.Controls.UserControl
     {
         if (Skill == null) return;
         
-        var selectedBuff = PriorityOverrideConditionComboBox.SelectedItem?.ToString() ?? PriorityOverrideConditionComboBox.Text;
+        var selectedItem = PriorityOverrideConditionComboBox.SelectedItem?.ToString() ?? "";
+        var selectedBuff = selectedItem.StartsWith("⚠ ") ? selectedItem[2..] : selectedItem;
+        
         if (Skill.PriorityOverrideCondition != selectedBuff)
         {
             Skill.PriorityOverrideCondition = selectedBuff;
             ConfigChanged?.Invoke();
+            ValidateReferences();
         }
     }
     
@@ -352,11 +588,14 @@ public partial class SkillCardControl : System.Windows.Controls.UserControl
     {
         if (Skill == null) return;
         
-        var selectedGroup = SkillGroupComboBox.SelectedItem?.ToString() ?? SkillGroupComboBox.Text;
+        var selectedItem = SkillGroupComboBox.SelectedItem?.ToString() ?? "";
+        var selectedGroup = selectedItem.StartsWith("⚠ ") ? selectedItem[2..] : selectedItem;
+        
         if (Skill.SkillGroup != selectedGroup)
         {
             Skill.SkillGroup = selectedGroup;
             ConfigChanged?.Invoke();
+            ValidateReferences();
         }
     }
     
@@ -367,11 +606,14 @@ public partial class SkillCardControl : System.Windows.Controls.UserControl
     {
         if (Skill == null) return;
         
-        var selectedSkill = PreCastSkillNameComboBox.SelectedItem?.ToString() ?? PreCastSkillNameComboBox.Text;
+        var selectedItem = PreCastSkillNameComboBox.SelectedItem?.ToString() ?? "";
+        var selectedSkill = selectedItem.StartsWith("⚠ ") ? selectedItem[2..] : selectedItem;
+        
         if (Skill.PreCastSkillName != selectedSkill)
         {
             Skill.PreCastSkillName = selectedSkill;
             ConfigChanged?.Invoke();
+            ValidateReferences();
         }
     }
     

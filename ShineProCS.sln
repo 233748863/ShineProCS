@@ -5,6 +5,10 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShineProCS", "ShineProCS.csproj", "{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{0AB3BF05-4346-4AA6-1389-037BE0695223}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShineProCS.Tests", "Tests\ShineProCS.Tests.csproj", "{CFB701FB-9AF5-47C2-9230-FB3CE129D8AB}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,8 +31,23 @@ Global
 		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Release|x64.Build.0 = Release|Any CPU
 		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Release|x86.ActiveCfg = Release|Any CPU
 		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Release|x86.Build.0 = Release|Any CPU
+		{CFB701FB-9AF5-47C2-9230-FB3CE129D8AB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CFB701FB-9AF5-47C2-9230-FB3CE129D8AB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CFB701FB-9AF5-47C2-9230-FB3CE129D8AB}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{CFB701FB-9AF5-47C2-9230-FB3CE129D8AB}.Debug|x64.Build.0 = Debug|Any CPU
+		{CFB701FB-9AF5-47C2-9230-FB3CE129D8AB}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{CFB701FB-9AF5-47C2-9230-FB3CE129D8AB}.Debug|x86.Build.0 = Debug|Any CPU
+		{CFB701FB-9AF5-47C2-9230-FB3CE129D8AB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CFB701FB-9AF5-47C2-9230-FB3CE129D8AB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CFB701FB-9AF5-47C2-9230-FB3CE129D8AB}.Release|x64.ActiveCfg = Release|Any CPU
+		{CFB701FB-9AF5-47C2-9230-FB3CE129D8AB}.Release|x64.Build.0 = Release|Any CPU
+		{CFB701FB-9AF5-47C2-9230-FB3CE129D8AB}.Release|x86.ActiveCfg = Release|Any CPU
+		{CFB701FB-9AF5-47C2-9230-FB3CE129D8AB}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{CFB701FB-9AF5-47C2-9230-FB3CE129D8AB} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal

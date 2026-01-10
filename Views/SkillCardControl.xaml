@@ -366,18 +366,37 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <StackPanel Margin="0,0,8,0">
-                            <TextBlock Text="条件Buff (释放前置条件)" FontSize="12" Foreground="#999" Margin="0,0,0,4"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                <TextBlock Text="条件Buff (释放前置条件)" FontSize="12" Foreground="#999"/>
+                                <TextBlock x:Name="ConditionBuffWarning" Text="⚠" Foreground="#FF9800" FontSize="12" Margin="4,0,0,0" Visibility="Collapsed" ToolTip="引用的Buff不存在"/>
+                            </StackPanel>
                             <ComboBox x:Name="ConditionBuffComboBox" 
-                                      Text="{Binding ConditionBuff, Mode=TwoWay}" 
-                                      IsEditable="True"
                                       ToolTip="只有当此Buff存在时才能释放该技能"
                                       SelectionChanged="ConditionBuffComboBox_SelectionChanged"/>
                         </StackPanel>
                         <StackPanel Grid.Column="1" Margin="8,0,0,0">
-                            <TextBlock Text="技能组" FontSize="12" Foreground="#999" Margin="0,0,0,4"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                <TextBlock Text="排除条件Buff (跳过条件)" FontSize="12" Foreground="#999"/>
+                                <TextBlock x:Name="ExcludeConditionBuffWarning" Text="⚠" Foreground="#FF9800" FontSize="12" Margin="4,0,0,0" Visibility="Collapsed" ToolTip="引用的Buff不存在"/>
+                            </StackPanel>
+                            <ComboBox x:Name="ExcludeConditionBuffComboBox" 
+                                      ToolTip="当此Buff存在时跳过该技能（与条件Buff相反）"
+                                      SelectionChanged="ExcludeConditionBuffComboBox_SelectionChanged"/>
+                        </StackPanel>
+                    </Grid>
+                    
+                    <!-- 技能组 -->
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Margin="0,0,8,0">
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                <TextBlock Text="技能组" FontSize="12" Foreground="#999"/>
+                                <TextBlock x:Name="SkillGroupWarning" Text="⚠" Foreground="#FF9800" FontSize="12" Margin="4,0,0,0" Visibility="Collapsed" ToolTip="引用的技能组不存在"/>
+                            </StackPanel>
                             <ComboBox x:Name="SkillGroupComboBox" 
-                                      Text="{Binding SkillGroup, Mode=TwoWay}" 
-                                      IsEditable="True"
                                       ToolTip="属于同一技能组的技能共享组级别的条件"
                                       SelectionChanged="SkillGroupComboBox_SelectionChanged"/>
                         </StackPanel>
@@ -390,10 +409,11 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <StackPanel Margin="0,0,8,0">
-                            <TextBlock Text="优先级覆盖条件Buff" FontSize="12" Foreground="#999" Margin="0,0,0,4"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                <TextBlock Text="优先级覆盖条件Buff" FontSize="12" Foreground="#999"/>
+                                <TextBlock x:Name="PriorityOverrideConditionWarning" Text="⚠" Foreground="#FF9800" FontSize="12" Margin="4,0,0,0" Visibility="Collapsed" ToolTip="引用的Buff不存在"/>
+                            </StackPanel>
                             <ComboBox x:Name="PriorityOverrideConditionComboBox" 
-                                      Text="{Binding PriorityOverrideCondition, Mode=TwoWay}" 
-                                      IsEditable="True"
                                       ToolTip="当此Buff存在时，使用覆盖优先级"
                                       SelectionChanged="PriorityOverrideConditionComboBox_SelectionChanged"/>
                         </StackPanel>
@@ -461,18 +481,20 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <StackPanel Margin="0,0,8,0">
-                            <TextBlock Text="前置技能名称" FontSize="12" Foreground="#999" Margin="0,0,0,4"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                <TextBlock Text="前置技能名称" FontSize="12" Foreground="#999"/>
+                                <TextBlock x:Name="PreCastSkillNameWarning" Text="⚠" Foreground="#FF9800" FontSize="12" Margin="4,0,0,0" Visibility="Collapsed" ToolTip="引用的技能不存在"/>
+                            </StackPanel>
                             <ComboBox x:Name="PreCastSkillNameComboBox" 
-                                      Text="{Binding PreCastSkillName, Mode=TwoWay}" 
-                                      IsEditable="True"
                                       ToolTip="释放此技能前，先释放指定名称的前置技能"
                                       SelectionChanged="PreCastSkillNameComboBox_SelectionChanged"/>
                         </StackPanel>
                         <StackPanel Grid.Column="1" Margin="8,0,0,0">
-                            <TextBlock Text="触发条件Buff" FontSize="12" Foreground="#999" Margin="0,0,0,4"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                <TextBlock Text="触发条件Buff" FontSize="12" Foreground="#999"/>
+                                <TextBlock x:Name="BuffWarning" Text="⚠" Foreground="#FF9800" FontSize="12" Margin="4,0,0,0" Visibility="Collapsed" ToolTip="引用的Buff不存在"/>
+                            </StackPanel>
                             <ComboBox x:Name="BuffComboBox" 
-                                      Text="{Binding PreCastConditionBuff, Mode=TwoWay}" 
-                                      IsEditable="True"
                                       SelectionChanged="BuffComboBox_SelectionChanged"/>
                         </StackPanel>
                     </Grid>

@@ -113,10 +113,8 @@ public class PresetManager
     {
         if (preset.IsBuiltIn)
         {
-            // 内置预设只返回技能配置
-            var skills = GetBuiltInPresetSkills(preset.Id);
-            if (skills == null) return null;
-            return new FullPresetData { Skills = skills };
+            // 内置预设返回完整配置
+            return GetBuiltInFullPreset(preset.Id);
         }
         
         if (string.IsNullOrEmpty(preset.FilePath) || !File.Exists(preset.FilePath))
@@ -365,6 +363,21 @@ public class PresetManager
     }
 
     /// <summary>
+    /// 获取内置预设的完整配置（包括技能、Buff库、技能组）
+    /// </summary>
+    private static FullPresetData? GetBuiltInFullPreset(string presetId)
+    {
+        return presetId switch
+        {
+            "basic-rotation" => new FullPresetData { Skills = GetBasicRotationPreset() },
+            "buff-combo" => GetBuffComboFullPreset(),
+            "suke-preset" => GetSukeFullPreset(),
+            "empty" => new FullPresetData(),
+            _ => null
+        };
+    }
+
+    /// <summary>
     /// 基础循环预设
     /// </summary>
     private static List<SkillConfig> GetBasicRotationPreset()
@@ -401,6 +414,29 @@ public class PresetManager
             new SkillConfig { Name = "填充技能1", KeyCode = 51, Priority = 70, Enabled = true },
             new SkillConfig { Name = "填充技能2", KeyCode = 52, Priority = 60, Enabled = true }
         ];
+    }
+
+    /// <summary>
+    /// Buff联动示例完整预设（包含Buff库）
+    /// </summary>
+    private static FullPresetData GetBuffComboFullPreset()
+    {
+        return new FullPresetData
+        {
+            Skills = GetBuffComboPreset(),
+            BuffLibrary =
+            [
+                new BuffConfig
+                {
+                    Name = "增益Buff",
+                    DisplayName = "增益Buff",
+                    Description = "示例增益Buff，用于演示联动技能触发条件",
+                    Enabled = true,
+                    IsDebuff = false,
+                    SimilarityThreshold = 0.8
+                }
+            ]
+        };
     }
 
     /// <summary>
@@ -499,6 +535,51 @@ public class PresetManager
                 PriorityOverrideValue = 170
             }
         ];
+    }
+
+    /// <summary>
+    /// 素柯门派完整预设（包含技能组和Buff库）
+    /// </summary>
+    private static FullPresetData GetSukeFullPreset()
+    {
+        return new FullPresetData
+        {
+            Skills = GetSukePreset(),
+            SkillGroups =
+            [
+                new SkillGroupConfig
+                {
+                    Name = "素柯技能组",
+                    ConditionBuff = "素柯状态",
+                    Enabled = true
+                }
+            ],
+            BuffLibrary =
+            [
+                new BuffConfig
+                {
+                    Name = "素柯状态",
+                    DisplayName = "素柯状态",
+                    Description = "素柯门派核心状态，激活后可使用素柯技能组内的技能",
+                    Enabled = true,
+                    IsDebuff = false,
+                    SimilarityThreshold = 0.8
+                },
+                new BuffConfig
+                {
+                    Name = "千枝气劲",
+                    DisplayName = "千枝气劲",
+                    Description = "千枝绽蕊和七情和合的触发条件Buff",
+                    Enabled = true,
+                    IsDebuff = false,
+                    SimilarityThreshold = 0.8
+                }
+            ],
+            InitialStates = new Dictionary<string, bool>
+            {
+                { "七情和合启用", true }
+            }
+        };
     }
 
     private static string SanitizeFileName(string name)

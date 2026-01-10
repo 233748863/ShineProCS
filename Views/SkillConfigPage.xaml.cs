@@ -667,13 +667,48 @@ public partial class SkillConfigPage : System.Windows.Controls.UserControl
                 var item = new MenuItem { Header = preset.Name, ToolTip = preset.Description };
                 item.Click += (s, args) =>
                 {
-                    var skills = _presetManager.LoadPreset(preset);
-                    if (skills != null)
+                    // 使用完整预设加载（包含技能、Buff库、技能组）
+                    var fullPreset = _presetManager.LoadFullPreset(preset);
+                    if (fullPreset != null)
                     {
-                        _viewModel.Skills.Clear();
-                        foreach (var skill in skills) _viewModel.Skills.Add(skill);
-                        ToastManager.Success($"已加载预设: {preset.Name}", "预设");
+                        // 获取ConfigManager以应用完整配置
+                        var configManager = (Window.GetWindow(this) as MainWindow)?.GetConfigManager();
+                        if (configManager != null)
+                        {
+                            _presetManager.ApplyFullPreset(fullPreset, configManager.AppSettings, _viewModel.Skills);
+                            
+                            // 构建加载信息
+                            var loadedInfo = new List<string> { $"{fullPreset.Skills.Count}个技能" };
+                            if (fullPreset.BuffLibrary.Count > 0)
+                                loadedInfo.Add($"{fullPreset.BuffLibrary.Count}个Buff");
+                            if (fullPreset.SkillGroups.Count > 0)
+                                loadedInfo.Add($"{fullPreset.SkillGroups.Count}个技能组");
+                            
+                            ToastManager.Success($"已加载预设: {preset.Name}\n包含: {string.Join(", ", loadedInfo)}", "预设");
+                        }
+                        else
+                        {
+                            // 回退到只加载技能
+                            _viewModel.Skills.Clear();
+                            foreach (var skill in fullPreset.Skills) _viewModel.Skills.Add(skill);
+                            ToastManager.Success($"已加载预设: {preset.Name}", "预设");
+                        }
                         MarkUnsaved();
+                        
+                        // 刷新所有技能卡片的下拉框
+                        foreach (var card in _skillCards)
+                        {
+                            card.RefreshBuffComboBox();
+                            card.RefreshConditionBuffComboBox();
+                            card.RefreshExcludeConditionBuffComboBox();
+                            card.RefreshPriorityOverrideConditionComboBox();
+                            card.RefreshSkillGroupComboBox();
+                            card.RefreshPreCastSkillNameComboBox();
+                        }
+                    }
+                    else
+                    {
+                        ToastManager.Error("加载预设失败", "预设");
                     }
                 };
                 menu.Items.Add(item);

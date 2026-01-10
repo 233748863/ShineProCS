@@ -254,14 +254,112 @@
                                 </StackPanel>
                             </ui:Card>
                             
+                            <!-- 输入驱动设置 -->
+                            <ui:Card Margin="0,0,0,16">
+                                <StackPanel>
+                                    <TextBlock Text="输入驱动设置" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,12"/>
+                                    <TextBlock Text="选择键盘/鼠标输入方式，GhostBox 为硬件级模拟" Foreground="#888" FontSize="12" Margin="0,0,0,12"/>
+                                    
+                                    <!-- 驱动选择下拉框 -->
+                                    <Grid Margin="0,0,0,12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel>
+                                            <TextBlock Text="驱动类型" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                                            <ComboBox SelectedIndex="{Binding SelectedDriverIndex}" Width="250" HorizontalAlignment="Left">
+                                                <ComboBoxItem Content="Win32 (软件模拟)"/>
+                                                <ComboBoxItem Content="GhostBox (硬件驱动)" IsEnabled="{Binding IsGhostBoxAvailable}"/>
+                                            </ComboBox>
+                                            <TextBlock Text="Win32 使用系统 API 模拟，GhostBox 使用硬件设备" Style="{StaticResource HintTextStyle}"/>
+                                        </StackPanel>
+                                    </Grid>
+                                    
+                                    <!-- GhostBox 连接状态区域 -->
+                                    <Border Background="#252525" CornerRadius="6" Padding="12" Margin="0,0,0,8" Visibility="{Binding IsGhostBoxSelected, Converter={StaticResource BoolToVis}}">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel>
+                                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                                    <TextBlock Text="连接状态: " Foreground="#999"/>
+                                                    <TextBlock Text="{Binding GhostBoxConnectionStatus}" FontWeight="SemiBold">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Foreground" Value="#F44336"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsGhostBoxConnected}" Value="True">
+                                                                        <Setter Property="Foreground" Value="#4CAF50"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                </StackPanel>
+                                                <TextBlock Text="{Binding GhostBoxDeviceInfo}" Foreground="#888" FontSize="11" Visibility="{Binding IsGhostBoxConnected, Converter={StaticResource BoolToVis}}"/>
+                                                <TextBlock Text="{Binding GhostBoxErrorMessage}" Foreground="#F44336" FontSize="11" TextWrapping="Wrap" Visibility="{Binding HasGhostBoxError, Converter={StaticResource BoolToVis}}"/>
+                                            </StackPanel>
+                                            <ui:Button Grid.Column="1" Content="重新连接" Height="32" VerticalAlignment="Center" Command="{Binding ReconnectGhostBoxCommand}" Icon="{ui:SymbolIcon ArrowSync20}"/>
+                                        </Grid>
+                                    </Border>
+                                    
+                                    <!-- GhostBox 不可用提示 -->
+                                    <Border Background="#3D2020" CornerRadius="6" Padding="12" Visibility="{Binding IsGhostBoxAvailable, Converter={StaticResource InvBoolToVis}}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <ui:SymbolIcon Symbol="Warning24" Foreground="#F44336" Margin="0,0,8,0"/>
+                                            <TextBlock Text="GhostBox DLL 未找到，请将 gbild32.dll 和 gbild64.dll 放入 libs/ghostbox/ 目录" Foreground="#F44336" TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </ui:Card>
+                            
                             <!-- 窗口捕获设置 -->
                             <ui:Card Margin="0,0,0,16">
                                 <StackPanel>
                                     <TextBlock Text="窗口捕获设置" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,12"/>
                                     <StackPanel Margin="0,0,0,12">
-                                        <TextBlock Text="目标窗口标题" FontWeight="SemiBold" Margin="0,0,0,4"/>
-                                        <ui:TextBox Text="{Binding Settings.TargetWindowTitle}"/>
-                                        <TextBlock Text="游戏窗口标题，支持部分匹配" Style="{StaticResource HintTextStyle}"/>
+                                        <TextBlock Text="目标窗口" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <ComboBox 
+                                                ItemsSource="{Binding WindowList}" 
+                                                SelectedItem="{Binding SelectedWindow}" 
+                                                DisplayMemberPath="DisplayText"
+                                                IsEnabled="{Binding IsRefreshingWindows, Converter={StaticResource InvBool}}">
+                                                <ComboBox.Style>
+                                                    <Style TargetType="ComboBox" BasedOn="{StaticResource {x:Type ComboBox}}">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding SelectedWindow}" Value="{x:Null}">
+                                                                <Setter Property="Text" Value="请选择目标窗口"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </ComboBox.Style>
+                                            </ComboBox>
+                                            <ui:Button 
+                                                Grid.Column="1" 
+                                                Height="32" 
+                                                Margin="8,0,0,0" 
+                                                Command="{Binding RefreshWindowListCommand}"
+                                                IsEnabled="{Binding IsRefreshingWindows, Converter={StaticResource InvBool}}"
+                                                ToolTip="刷新窗口列表">
+                                                <ui:Button.Content>
+                                                    <Grid>
+                                                        <!-- 正常状态显示刷新图标 -->
+                                                        <ui:SymbolIcon Symbol="ArrowSync20" Visibility="{Binding IsRefreshingWindows, Converter={StaticResource InvBoolToVis}}"/>
+                                                        <!-- 加载状态显示进度环 -->
+                                                        <ui:ProgressRing IsIndeterminate="True" Width="16" Height="16" Visibility="{Binding IsRefreshingWindows, Converter={StaticResource BoolToVis}}"/>
+                                                    </Grid>
+                                                </ui:Button.Content>
+                                            </ui:Button>
+                                        </Grid>
+                                        <TextBlock Text="从下拉列表选择目标窗口，点击刷新按钮更新列表" Style="{StaticResource HintTextStyle}"/>
                                     </StackPanel>
                                     <ui:ToggleSwitch IsChecked="{Binding Settings.UseWGC}" Content="使用 Windows Graphics Capture" Margin="0,0,0,8"/>
                                     <TextBlock Text="WGC性能更好，但需要Windows 10 1903+，关闭则使用BitBlt" Style="{StaticResource HintTextStyle}"/>
