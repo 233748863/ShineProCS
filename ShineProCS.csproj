@@ -3,6 +3,7 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net9.0-windows</TargetFramework>
+    <PlatformTarget>x64</PlatformTarget>
     <NoWarn>CA1416</NoWarn>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -13,18 +14,6 @@
     <RootNamespace>ShineProCS</RootNamespace>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
   </PropertyGroup>
-
-  <!-- 排除 Tests 文件夹和 better-genshin-impact 参考源码目录 -->
-  <ItemGroup>
-    <Compile Remove="Tests\**" />
-    <None Remove="Tests\**" />
-    <Compile Remove="better-genshin-impact\**" />
-    <None Remove="better-genshin-impact\**" />
-    <Content Remove="better-genshin-impact\**" />
-    <EmbeddedResource Remove="better-genshin-impact\**" />
-    <Page Remove="better-genshin-impact\**" />
-    <ApplicationDefinition Remove="better-genshin-impact\**" />
-  </ItemGroup>
 
   <ItemGroup>
     <!-- MVVM 工具包 -->
