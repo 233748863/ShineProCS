@@ -260,6 +260,51 @@ public class ConfigManager
         if ((int)settings.InputDriverType < 0 || (int)settings.InputDriverType > 1)
             settings.InputDriverType = InputDriverType.Win32;
         
+        // 验证 GhostBox 输入延迟配置（需求 6.1, 6.2, 6.6）
+        if (settings.KeyPressMinDelayMs < 0)
+            settings.KeyPressMinDelayMs = 0;
+        else if (settings.KeyPressMinDelayMs > 500)
+            settings.KeyPressMinDelayMs = 500;
+        
+        if (settings.KeyPressMaxDelayMs < 0)
+            settings.KeyPressMaxDelayMs = 0;
+        else if (settings.KeyPressMaxDelayMs > 1000)
+            settings.KeyPressMaxDelayMs = 1000;
+        
+        // 确保最大延迟 >= 最小延迟
+        if (settings.KeyPressMaxDelayMs < settings.KeyPressMinDelayMs)
+            settings.KeyPressMaxDelayMs = settings.KeyPressMinDelayMs;
+        
+        if (settings.MinInterKeyDelayMs < 0)
+            settings.MinInterKeyDelayMs = 0;
+        else if (settings.MinInterKeyDelayMs > 200)
+            settings.MinInterKeyDelayMs = 200;
+        
+        if (settings.BezierMouseSteps < 5)
+            settings.BezierMouseSteps = 5;
+        else if (settings.BezierMouseSteps > 100)
+            settings.BezierMouseSteps = 100;
+        
+        // 验证 GhostBox 重连配置（需求 6.4, 6.5）
+        if (settings.ReconnectRetryIntervalMs < 500)
+            settings.ReconnectRetryIntervalMs = 500;
+        else if (settings.ReconnectRetryIntervalMs > 30000)
+            settings.ReconnectRetryIntervalMs = 30000;
+        
+        if (settings.ReconnectMaxRetries < 0)
+            settings.ReconnectMaxRetries = 0;
+        else if (settings.ReconnectMaxRetries > 100)
+            settings.ReconnectMaxRetries = 100;
+        
+        // 验证硬件加速配置（需求 5.1, 5.5）
+        if (settings.InferenceDeviceType < 0 || settings.InferenceDeviceType > 1)
+            settings.InferenceDeviceType = 0; // 默认 CPU
+        
+        if (settings.GpuDeviceId < 0)
+            settings.GpuDeviceId = 0;
+        else if (settings.GpuDeviceId > 15) // 最多支持 16 个 GPU
+            settings.GpuDeviceId = 0;
+        
         // 确保BuffLibrary已初始化
         settings.BuffLibrary ??= [];
         

@@ -259,6 +259,39 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
     }
     
+    #endregion
+    
+    #region GPU/CPU 切换相关属性（需求 5.1）
+    
+    /// <summary>
+    /// 推理设备索引 (0=CPU, 1=DirectML GPU)
+    /// 需求 5.1: 支持两种推理设备类型
+    /// </summary>
+    public int InferenceDeviceIndex
+    {
+        get => AppSettings.InferenceDeviceType;
+        set
+        {
+            if (AppSettings.InferenceDeviceType != value)
+            {
+                AppSettings.InferenceDeviceType = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(IsGpuModeEnabled));
+                OnLog($"推理设备已切换为: {(value == 0 ? "CPU" : "DirectML GPU")}", 1);
+            }
+        }
+    }
+    
+    /// <summary>
+    /// 是否启用了 GPU 模式
+    /// 用于控制 GPU 设备 ID 输入框的启用状态
+    /// </summary>
+    public bool IsGpuModeEnabled => AppSettings.InferenceDeviceType == 1;
+    
+    #endregion
+    
+    #region GhostBox 错误信息属性
+    
     /// <summary>
     /// GhostBox 错误信息
     /// </summary>

@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
+using ShineProCS.Core.Services;
 
 namespace ShineProCS.Infrastructure;
 
@@ -9,6 +10,7 @@ namespace ShineProCS.Infrastructure;
 /// GhostBox 设备管理器 - 单例模式
 /// 管理 GhostBox 硬件设备的连接，供键盘和鼠标驱动共享
 /// 仅支持 64 位系统
+/// 需求 6.4, 6.5: 支持设备断开处理和自动重连
 /// </summary>
 public sealed class GhostBoxDeviceManager : IDisposable
 {
@@ -109,6 +111,9 @@ public sealed class GhostBoxDeviceManager : IDisposable
     private string _lastError = string.Empty;
     private readonly object _lockObject = new object();
     
+    // 自动重连管理器（需求 6.4, 6.5）
+    private AutoReconnectManager? _reconnectManager;
+    
     /// <summary>
     /// 设备是否已连接
     /// </summary>
@@ -142,6 +147,34 @@ public sealed class GhostBoxDeviceManager : IDisposable
     /// </summary>
     public string SerialNumber { get; private set; } = string.Empty;
     
+    /// <summary>
+    /// 获取自动重连管理器
+    /// 需求 6.4, 6.5: 支持自动重连
+    /// </summary>
+    public AutoReconnectManager? ReconnectManager => _reconnectManager;
+    
+    #endregion
+    
+    #region 事件（需求 6.4）
+    
+    /// <summary>
+    /// 设备断开时触发
+    /// 需求 6.4: 优雅处理设备断开错误并通知引擎
+    /// </summary>
+    public event Action? OnDeviceDisconnected;
+    
+    /// <summary>
+    /// 设备重连成功时触发
+    /// 需求 6.4: 通知引擎设备已重新连接
+    /// </summary>
+    public event Action? OnDeviceReconnected;
+    
+    /// <summary>
+    /// 重连失败时触发
+    /// 需求 6.4: 通知引擎重连失败
+    /// </summary>
+    public event Action<string>? OnReconnectFailed;
+    
     #endregion
 
     #region 构造函数
@@ -158,6 +191,26 @@ public sealed class GhostBoxDeviceManager : IDisposable
     #endregion
     
     #region 公共方法
+    
+    /// <summary>
+    /// 初始化自动重连管理器
+    /// 需求 6.5: 支持自动重连尝试，重试间隔可配置
+    /// </summary>
+    /// <param name="retryIntervalMs">重试间隔（毫秒）</param>
+    /// <param name="maxRetries">最大重试次数（0 = 无限）</param>
+    public void InitializeAutoReconnect(int retryIntervalMs = 2000, int maxRetries = 5)
+    {
+        // 清理旧的重连管理器
+        _reconnectManager?.Dispose();
+        
+        // 创建新的重连管理器
+        _reconnectManager = new AutoReconnectManager(this, retryIntervalMs, maxRetries);
+        
+        // 订阅事件
+        _reconnectManager.OnDeviceDisconnected += () => OnDeviceDisconnected?.Invoke();
+        _reconnectManager.OnReconnected += () => OnDeviceReconnected?.Invoke();
+        _reconnectManager.OnReconnectFailed += (msg) => OnReconnectFailed?.Invoke(msg);
+    }
     
     /// <summary>
     /// 连接 GhostBox 设备
@@ -272,7 +325,15 @@ public sealed class GhostBoxDeviceManager : IDisposable
         
         try
         {
+            bool wasConnected = IsConnected;
             IsConnected = NativeIsConnected() != 0;
+            
+            // 检测到断开，触发事件（需求 6.4）
+            if (wasConnected && !IsConnected)
+            {
+                OnDeviceDisconnected?.Invoke();
+            }
+            
             return IsConnected;
         }
         catch
@@ -280,6 +341,21 @@ public sealed class GhostBoxDeviceManager : IDisposable
             IsConnected = false;
             return false;
         }
+    }
+    
+    /// <summary>
+    /// 检查连接状态，如果断开则尝试自动重连
+    /// 需求 6.4, 6.5: 优雅处理设备断开并支持自动重连
+    /// </summary>
+    /// <returns>设备是否已连接</returns>
+    public bool CheckAndAutoReconnect()
+    {
+        if (_reconnectManager != null)
+        {
+            return _reconnectManager.CheckAndReconnect();
+        }
+        
+        return RefreshConnectionStatus();
     }
     
     #endregion
@@ -413,6 +489,8 @@ public sealed class GhostBoxDeviceManager : IDisposable
     public void Dispose()
     {
         if (_disposed) return;
+        
+        _reconnectManager?.Dispose();
         Disconnect();
         _disposed = true;
     }

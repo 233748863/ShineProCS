@@ -4,7 +4,9 @@
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
              xmlns:utils="clr-namespace:ShineProCS.Utils"
              xmlns:dd="urn:gong-wpf-dragdrop"
-             xmlns:local="clr-namespace:ShineProCS.Views">
+             xmlns:local="clr-namespace:ShineProCS.Views"
+             VerticalAlignment="Stretch"
+             HorizontalAlignment="Stretch">
     
     <UserControl.Resources>
         <utils:KeyCodeToNameConverter x:Key="KeyToName"/>
@@ -12,7 +14,8 @@
         <utils:InverseBoolToVisibilityConverter x:Key="InvBoolToVis"/>
     </UserControl.Resources>
     
-    <Grid>
+    <!-- 主布局 Grid：确保填充整个可用空间 -->
+    <Grid VerticalAlignment="Stretch">
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
@@ -22,8 +25,10 @@
         </Grid.ColumnDefinitions>
         
         <!-- 左侧：技能卡片列表 -->
-        <ui:Card Margin="0,0,16,0">
-            <Grid>
+        <!-- 使用 VerticalContentAlignment="Stretch" 确保内容填充整个 Card 高度 -->
+        <ui:Card Margin="0,0,16,0" VerticalAlignment="Stretch" VerticalContentAlignment="Stretch">
+            <!-- 内部 Grid 也需要 Stretch 以填充 Card 的整个高度 -->
+            <Grid VerticalAlignment="Stretch">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
@@ -63,7 +68,9 @@
                 </StackPanel>
                 
                 <!-- 技能卡片列表 - 支持拖拽排序，放在中间行以填充剩余空间 -->
-                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="0,8">
+                <!-- 添加 PreviewMouseWheel 事件处理，防止滚轮事件冒泡到外层 NavigationView -->
+                <ScrollViewer x:Name="SkillListScrollViewer" Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="0,8"
+                              PreviewMouseWheel="SkillListScrollViewer_PreviewMouseWheel">
                     <ItemsControl x:Name="SkillCardList" ItemsSource="{Binding Skills}"
                                   dd:DragDrop.IsDragSource="True"
                                   dd:DragDrop.IsDropTarget="True"

@@ -166,7 +166,20 @@ public partial class App : System.Windows.Application
                 // ========== 识别服务（单例） ==========
                 // 需求 15.1: OCR 服务
                 // 需求 16.1: YOLO 服务
-                services.AddSingleton<HardwareAccelerationConfig>();
+                // 需求 5.1, 5.5: 从 AppSettings 读取硬件加速配置
+                services.AddSingleton<HardwareAccelerationConfig>(sp =>
+                {
+                    var configManager = sp.GetRequiredService<ConfigManager>();
+                    var appSettings = configManager.AppSettings;
+                    
+                    // 从 AppSettings 创建 HardwareAccelerationConfig
+                    return new HardwareAccelerationConfig
+                    {
+                        InferenceDevice = (InferenceDeviceType)appSettings.InferenceDeviceType,
+                        GpuDevice = appSettings.GpuDeviceId,
+                        CpuOcr = appSettings.CpuOcr
+                    };
+                });
                 services.AddSingleton<BgiOnnxFactory>();
                 services.AddSingleton<IOcrService>(sp =>
                 {

@@ -7,12 +7,12 @@
          ui:Design.Background="{DynamicResource ApplicationBackgroundBrush}"
          ui:Design.Foreground="{DynamicResource TextFillColorPrimaryBrush}"
          Foreground="{DynamicResource TextFillColorPrimaryBrush}">
-    
+
     <!-- 
     需求 6: 全局设置页
     需求 13.3, 13.4, 13.5: 统一间距、Card组件和SymbolIcon使用
     -->
-    
+
     <Page.Resources>
         <utils:InverseBooleanConverter x:Key="InvBool"/>
         <utils:KeyCodeToNameConverter x:Key="KeyToName"/>
@@ -22,12 +22,20 @@
         <utils:PointArrayToStringConverter x:Key="PointArrayToString"/>
         <utils:ColorToBrushConverter x:Key="ColorToBrush"/>
     </Page.Resources>
-    
-    <!-- 需求 13.3: 使用统一的页面边距 -->
-    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="{StaticResource PageMargin}" Padding="0,0,12,0">
-        <StackPanel MaxWidth="700">
-            <TextBlock Text="全局设置" Style="{StaticResource PageTitleStyle}"/>
-            
+
+    <!-- 使用 Grid 包裹以确保正确的布局约束 -->
+    <!-- 解决 WPF UI 库 NavigationView 内部布局导致 ScrollViewer 的 ViewportHeight 不正确的问题 -->
+    <Grid Margin="{StaticResource PageMargin}">
+        <!-- 需求 13.3: 使用统一的页面边距 -->
+        <ScrollViewer x:Name="MainScrollViewer" 
+                      VerticalScrollBarVisibility="Auto" 
+                      HorizontalScrollBarVisibility="Disabled"
+                      Padding="0,0,12,0"
+                      CanContentScroll="False">
+            <!-- 内容区域：自适应宽度 -->
+            <StackPanel>
+                <TextBlock Text="全局设置" Style="{StaticResource PageTitleStyle}"/>
+
             <!-- 需求 6.2: 引擎设置分组 -->
             <!-- 需求 13.4: 使用 Card 组件分组 -->
             <ui:Card Margin="{StaticResource CardMargin}">
@@ -83,13 +91,13 @@
                     </Grid>
                 </StackPanel>
             </ui:Card>
-            
+
             <!-- 需求 6.2: 输入驱动设置分组 -->
             <ui:Card Margin="{StaticResource CardMargin}">
                 <StackPanel>
                     <TextBlock Text="输入驱动设置" Style="{StaticResource SectionTitleStyle}"/>
                     <TextBlock Text="选择键盘/鼠标输入方式，GhostBox 为硬件级模拟" Style="{StaticResource SecondaryTextStyle}" Margin="{StaticResource SectionMargin}"/>
-                    
+
                     <Grid Margin="{StaticResource SectionMargin}">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
@@ -104,7 +112,7 @@
                             <TextBlock Text="Win32 使用系统 API 模拟，GhostBox 使用硬件设备" Style="{StaticResource HintTextStyle}"/>
                         </StackPanel>
                     </Grid>
-                    
+
                     <!-- GhostBox 连接状态 -->
                     <Border Style="{StaticResource InfoPanelStyle}" 
                             Visibility="{Binding IsGhostBoxSelected, Converter={StaticResource BoolToVis}}">
@@ -138,7 +146,7 @@
                                        Command="{Binding ReconnectGhostBoxCommand}" Icon="{ui:SymbolIcon ArrowSync20}"/>
                         </Grid>
                     </Border>
-                    
+
                     <!-- GhostBox 不可用提示 -->
                     <Border Style="{StaticResource WarningPanelStyle}" 
                             Visibility="{Binding IsGhostBoxAvailable, Converter={StaticResource InvBoolToVis}}">
@@ -150,7 +158,7 @@
                     </Border>
                 </StackPanel>
             </ui:Card>
-            
+
             <!-- 需求 6.2: 窗口捕获设置分组 -->
             <ui:Card Margin="{StaticResource CardMargin}">
                 <StackPanel>
@@ -185,13 +193,13 @@
                     <TextBlock Text="WGC性能更好，但需要Windows 10 1903+，关闭则使用BitBlt" Style="{StaticResource HintTextStyle}"/>
                 </StackPanel>
             </ui:Card>
-            
+
             <!-- 需求 6.2: 检测区域设置分组 -->
             <ui:Card Margin="{StaticResource CardMargin}">
                 <StackPanel>
                     <TextBlock Text="检测区域设置" Style="{StaticResource SectionTitleStyle}"/>
                     <TextBlock Text="配置各种检测区域的屏幕坐标，点击框选按钮在屏幕上选择区域" Style="{StaticResource SecondaryTextStyle}" Margin="{StaticResource SectionMargin}"/>
-                    
+
                     <!-- 主检测区域 -->
                     <Grid Margin="{StaticResource SectionMargin}">
                         <Grid.ColumnDefinitions>
@@ -208,7 +216,7 @@
                         <ui:Button Grid.Column="3" Content="预览" Height="{StaticResource ButtonHeightMD}" Margin="4,0,0,0"
                                    Command="{Binding PreviewSettingsRegionCommand}" CommandParameter="Detection"/>
                     </Grid>
-                    
+
                     <!-- 自身血条区域 -->
                     <Grid Margin="{StaticResource SectionMargin}">
                         <Grid.ColumnDefinitions>
@@ -228,7 +236,7 @@
                         <ui:Button Grid.Column="4" Content="测试" Height="{StaticResource ButtonHeightMD}" Margin="4,0,0,0"
                                    Command="{Binding TestHpDetectionCommand}"/>
                     </Grid>
-                    
+
                     <!-- 自身蓝条区域 -->
                     <Grid Margin="{StaticResource SectionMargin}">
                         <Grid.ColumnDefinitions>
@@ -248,7 +256,7 @@
                         <ui:Button Grid.Column="4" Content="测试" Height="{StaticResource ButtonHeightMD}" Margin="4,0,0,0"
                                    Command="{Binding TestMpDetectionCommand}"/>
                     </Grid>
-                    
+
                     <!-- 目标血条区域 -->
                     <Grid Margin="{StaticResource SectionMargin}">
                         <Grid.ColumnDefinitions>
@@ -268,7 +276,7 @@
                         <ui:Button Grid.Column="4" Content="测试" Height="{StaticResource ButtonHeightMD}" Margin="4,0,0,0"
                                    Command="{Binding TestTargetHpDetectionCommand}"/>
                     </Grid>
-                    
+
                     <!-- 公共CD检测点 -->
                     <Grid Margin="{StaticResource ItemMargin}">
                         <Grid.ColumnDefinitions>
@@ -295,7 +303,7 @@
                     <TextBlock Text="公共CD检测点用于判断技能是否在公共冷却中" Style="{StaticResource HintTextStyle}"/>
                 </StackPanel>
             </ui:Card>
-            
+
             <!-- 全局快捷键设置 -->
             <ui:Card Margin="{StaticResource CardMargin}">
                 <StackPanel>
@@ -304,7 +312,7 @@
                         <ui:ToggleSwitch IsChecked="{Binding AppSettings.EnableGlobalHotkeys}" Content="启用" Margin="16,0,0,0"/>
                     </StackPanel>
                     <TextBlock Text="快捷键在游戏窗口中也能响应" Style="{StaticResource HintTextStyle}" Margin="{StaticResource SectionMargin}"/>
-                    
+
                     <!-- 启动/停止快捷键 -->
                     <Grid Margin="{StaticResource ItemMargin}">
                         <Grid.ColumnDefinitions>
@@ -328,7 +336,7 @@
                         <ui:Button Grid.Column="2" Content="设置" Height="{StaticResource ButtonHeightMD}" Margin="8,0,0,0" 
                                    Command="{Binding CaptureHotkeyCommand}" CommandParameter="StartStop"/>
                     </Grid>
-                    
+
                     <!-- 暂停快捷键 -->
                     <Grid Margin="{StaticResource ItemMargin}">
                         <Grid.ColumnDefinitions>
@@ -352,12 +360,151 @@
                         <ui:Button Grid.Column="2" Content="设置" Height="{StaticResource ButtonHeightMD}" Margin="8,0,0,0" 
                                    Command="{Binding CaptureHotkeyCommand}" CommandParameter="Pause"/>
                     </Grid>
-                    
+
                     <ui:Button Content="重新注册快捷键" Command="{Binding ReregisterHotkeysCommand}" Margin="0,8,0,0"/>
                 </StackPanel>
             </ui:Card>
-            
-            
+
+
+            <!-- 需求 5.1: GPU/CPU 切换设置 -->
+            <ui:Card Margin="{StaticResource CardMargin}">
+                <StackPanel>
+                    <TextBlock Text="硬件加速设置" Style="{StaticResource SectionTitleStyle}"/>
+                    <TextBlock Text="配置 ONNX 推理使用的硬件设备，DirectML 可利用 GPU 加速" Style="{StaticResource SecondaryTextStyle}" Margin="{StaticResource SectionMargin}"/>
+
+                    <!-- 推理设备选择 -->
+                    <Grid Margin="{StaticResource SectionMargin}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Margin="0,0,8,0">
+                            <TextBlock Text="推理设备" Style="{StaticResource FieldLabelStyle}"/>
+                            <ComboBox SelectedIndex="{Binding InferenceDeviceIndex}" Width="200" HorizontalAlignment="Left">
+                                <ComboBoxItem Content="CPU (兼容性最好)"/>
+                                <ComboBoxItem Content="DirectML (GPU 加速)"/>
+                            </ComboBox>
+                            <TextBlock Text="DirectML 使用 Windows 通用 GPU 加速" Style="{StaticResource HintTextStyle}"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                            <TextBlock Text="GPU 设备 ID" Style="{StaticResource FieldLabelStyle}"/>
+                            <ui:TextBox x:Name="GpuDeviceIdTextBox"
+                                        Text="{Binding AppSettings.GpuDeviceId, UpdateSourceTrigger=PropertyChanged}"
+                                        PreviewTextInput="NumericTextBox_PreviewTextInput"
+                                        Width="100" HorizontalAlignment="Left"
+                                        IsEnabled="{Binding IsGpuModeEnabled}"/>
+                            <TextBlock Text="多 GPU 系统可指定设备，默认 0" Style="{StaticResource HintTextStyle}"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- OCR 强制 CPU -->
+                    <ui:ToggleSwitch IsChecked="{Binding AppSettings.CpuOcr}" Content="OCR 强制使用 CPU" Margin="{StaticResource ItemMargin}"/>
+                    <TextBlock Text="某些环境下 GPU OCR 性能较差，可强制使用 CPU" Style="{StaticResource HintTextStyle}"/>
+                </StackPanel>
+            </ui:Card>
+
+            <!-- 需求 6.1, 6.2, 6.6: GhostBox 输入延迟设置 -->
+            <ui:Card Margin="{StaticResource CardMargin}" Visibility="{Binding IsGhostBoxSelected, Converter={StaticResource BoolToVis}}">
+                <StackPanel>
+                    <TextBlock Text="输入延迟设置" Style="{StaticResource SectionTitleStyle}"/>
+                    <TextBlock Text="配置 GhostBox 输入的随机延迟，使操作更像人类" Style="{StaticResource SecondaryTextStyle}" Margin="{StaticResource SectionMargin}"/>
+
+                    <!-- 启用随机延迟 -->
+                    <ui:ToggleSwitch IsChecked="{Binding AppSettings.EnableRandomDelay}" Content="启用随机延迟" Margin="{StaticResource ItemMargin}"/>
+
+                    <!-- 按键延迟范围 -->
+                    <Grid Margin="{StaticResource SectionMargin}" IsEnabled="{Binding AppSettings.EnableRandomDelay}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Margin="0,0,8,0">
+                            <TextBlock Text="按键最小延迟 (毫秒)" Style="{StaticResource FieldLabelStyle}"/>
+                            <ui:TextBox x:Name="KeyPressMinDelayTextBox"
+                                        Text="{Binding AppSettings.KeyPressMinDelayMs, UpdateSourceTrigger=PropertyChanged}"
+                                        PreviewTextInput="NumericTextBox_PreviewTextInput"
+                                        LostFocus="KeyPressMinDelayTextBox_LostFocus"/>
+                            <TextBlock Text="按键按下后的最小等待时间" Style="{StaticResource HintTextStyle}"/>
+                            <TextBlock x:Name="KeyPressMinDelayError" Style="{StaticResource ValidationErrorStyle}"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                            <TextBlock Text="按键最大延迟 (毫秒)" Style="{StaticResource FieldLabelStyle}"/>
+                            <ui:TextBox x:Name="KeyPressMaxDelayTextBox"
+                                        Text="{Binding AppSettings.KeyPressMaxDelayMs, UpdateSourceTrigger=PropertyChanged}"
+                                        PreviewTextInput="NumericTextBox_PreviewTextInput"
+                                        LostFocus="KeyPressMaxDelayTextBox_LostFocus"/>
+                            <TextBlock Text="按键按下后的最大等待时间" Style="{StaticResource HintTextStyle}"/>
+                            <TextBlock x:Name="KeyPressMaxDelayError" Style="{StaticResource ValidationErrorStyle}"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- 最小按键间隔 -->
+                    <StackPanel Margin="{StaticResource SectionMargin}">
+                        <TextBlock Text="最小按键间隔 (毫秒)" Style="{StaticResource FieldLabelStyle}"/>
+                        <ui:TextBox x:Name="MinInterKeyDelayTextBox"
+                                    Text="{Binding AppSettings.MinInterKeyDelayMs, UpdateSourceTrigger=PropertyChanged}"
+                                    PreviewTextInput="NumericTextBox_PreviewTextInput"
+                                    LostFocus="MinInterKeyDelayTextBox_LostFocus"
+                                    Width="150" HorizontalAlignment="Left"/>
+                        <TextBlock Text="连续按键之间的最小间隔，防止按键过快" Style="{StaticResource HintTextStyle}"/>
+                        <TextBlock x:Name="MinInterKeyDelayError" Style="{StaticResource ValidationErrorStyle}"/>
+                    </StackPanel>
+
+                    <!-- 贝塞尔曲线鼠标移动 -->
+                    <ui:ToggleSwitch IsChecked="{Binding AppSettings.UseBezierMouseMove}" Content="使用贝塞尔曲线鼠标移动" Margin="{StaticResource ItemMargin}"/>
+                    <TextBlock Text="模拟人类鼠标移动轨迹，使移动更自然" Style="{StaticResource HintTextStyle}"/>
+
+                    <!-- 贝塞尔曲线步数 -->
+                    <StackPanel Margin="{StaticResource SectionMargin}" IsEnabled="{Binding AppSettings.UseBezierMouseMove}">
+                        <TextBlock Text="鼠标移动路径点数" Style="{StaticResource FieldLabelStyle}"/>
+                        <ui:TextBox x:Name="BezierMouseStepsTextBox"
+                                    Text="{Binding AppSettings.BezierMouseSteps, UpdateSourceTrigger=PropertyChanged}"
+                                    PreviewTextInput="NumericTextBox_PreviewTextInput"
+                                    LostFocus="BezierMouseStepsTextBox_LostFocus"
+                                    Width="150" HorizontalAlignment="Left"/>
+                        <TextBlock Text="路径点越多移动越平滑，建议 10-50" Style="{StaticResource HintTextStyle}"/>
+                        <TextBlock x:Name="BezierMouseStepsError" Style="{StaticResource ValidationErrorStyle}"/>
+                    </StackPanel>
+                </StackPanel>
+            </ui:Card>
+
+            <!-- 需求 6.4, 6.5: GhostBox 重连设置 -->
+            <ui:Card Margin="{StaticResource CardMargin}" Visibility="{Binding IsGhostBoxSelected, Converter={StaticResource BoolToVis}}">
+                <StackPanel>
+                    <TextBlock Text="自动重连设置" Style="{StaticResource SectionTitleStyle}"/>
+                    <TextBlock Text="配置 GhostBox 设备断开后的自动重连行为" Style="{StaticResource SecondaryTextStyle}" Margin="{StaticResource SectionMargin}"/>
+
+                    <!-- 启用自动重连 -->
+                    <ui:ToggleSwitch IsChecked="{Binding AppSettings.EnableAutoReconnect}" Content="启用自动重连" Margin="{StaticResource ItemMargin}"/>
+
+                    <!-- 重连参数 -->
+                    <Grid Margin="{StaticResource SectionMargin}" IsEnabled="{Binding AppSettings.EnableAutoReconnect}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Margin="0,0,8,0">
+                            <TextBlock Text="重连间隔 (毫秒)" Style="{StaticResource FieldLabelStyle}"/>
+                            <ui:TextBox x:Name="ReconnectRetryIntervalTextBox"
+                                        Text="{Binding AppSettings.ReconnectRetryIntervalMs, UpdateSourceTrigger=PropertyChanged}"
+                                        PreviewTextInput="NumericTextBox_PreviewTextInput"
+                                        LostFocus="ReconnectRetryIntervalTextBox_LostFocus"/>
+                            <TextBlock Text="每次重连尝试之间的等待时间" Style="{StaticResource HintTextStyle}"/>
+                            <TextBlock x:Name="ReconnectRetryIntervalError" Style="{StaticResource ValidationErrorStyle}"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                            <TextBlock Text="最大重试次数" Style="{StaticResource FieldLabelStyle}"/>
+                            <ui:TextBox x:Name="ReconnectMaxRetriesTextBox"
+                                        Text="{Binding AppSettings.ReconnectMaxRetries, UpdateSourceTrigger=PropertyChanged}"
+                                        PreviewTextInput="NumericTextBox_PreviewTextInput"
+                                        LostFocus="ReconnectMaxRetriesTextBox_LostFocus"/>
+                            <TextBlock Text="0 表示无限重试" Style="{StaticResource HintTextStyle}"/>
+                            <TextBlock x:Name="ReconnectMaxRetriesError" Style="{StaticResource ValidationErrorStyle}"/>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </ui:Card>
+
             <!-- 需求 6.5: 配置导入导出 -->
             <!-- 需求 13.5: 使用 SymbolIcon 作为按钮图标 -->
             <ui:Card Margin="{StaticResource CardMargin}">
@@ -379,10 +526,11 @@
                     </StackPanel>
                 </StackPanel>
             </ui:Card>
-            
+
             <!-- 保存按钮 -->
             <ui:Button Content="保存设置" Appearance="Primary" Command="{Binding SaveSettingsCommand}" 
                        Height="{StaticResource ButtonHeightXL}" HorizontalAlignment="Stretch"/>
         </StackPanel>
     </ScrollViewer>
+    </Grid>
 </Page>

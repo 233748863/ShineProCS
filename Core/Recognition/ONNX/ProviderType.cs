@@ -2,36 +2,18 @@ namespace ShineProCS.Core.Recognition.ONNX;
 
 /// <summary>
 /// ONNX Runtime 执行提供程序类型
+/// 简化版本：仅支持 CPU 和 DirectML 两种 Provider
 /// </summary>
 public enum ProviderType
 {
     /// <summary>
-    /// TensorRT (NVIDIA GPU)
+    /// CPU 执行提供程序 - 默认选项，兼容性最好
     /// </summary>
-    TensorRt,
+    Cpu = 0,
     
     /// <summary>
-    /// CUDA (NVIDIA GPU)
+    /// DirectML 执行提供程序 - Windows GPU 加速
+    /// 支持大多数 Windows 设备上的 GPU（包括 NVIDIA、AMD、Intel）
     /// </summary>
-    Cuda,
-    
-    /// <summary>
-    /// DirectML (Windows GPU)
-    /// </summary>
-    Dml,
-    
-    /// <summary>
-    /// CPU
-    /// </summary>
-    Cpu,
-    
-    /// <summary>
-    /// DNNL (Intel CPU 优化)
-    /// </summary>
-    Dnnl,
-    
-    /// <summary>
-    /// OpenVINO (Intel GPU/CPU)
-    /// </summary>
-    OpenVino
+    Dml = 1
 }

@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using ShineProCS.ViewModels;
 
 namespace ShineProCS.Views.Pages;
@@ -9,6 +10,13 @@ namespace ShineProCS.Views.Pages;
 /// <summary>
 /// 设置页 - 全局配置
 /// 需求: 6.1, 6.2, 6.3, 6.4, 6.5
+/// 
+/// 注意：ScrollViewer 滚轮问题的解决方案
+/// 问题：WPF UI 库的 NavigationView 内部布局导致 ScrollViewer 的 ViewportHeight 不正确
+/// 解决：
+/// 1. 使用 Grid 包裹 ScrollViewer，确保正确的布局约束
+/// 2. 在 Loaded 事件中设置 MaxHeight，限制 ScrollViewer 的高度
+/// 3. 强制 WPF 重新计算布局，使 ViewportHeight 正确更新
 /// </summary>
 public partial class SettingsPage : Page
 {
@@ -19,6 +27,47 @@ public partial class SettingsPage : Page
         ViewModel = viewModel;
         DataContext = ViewModel;
         InitializeComponent();
+        
+        // 注册 ScrollViewer 的 Loaded 事件，用于设置 MaxHeight
+        MainScrollViewer.Loaded += MainScrollViewer_Loaded;
+    }
+
+    /// <summary>
+    /// ScrollViewer 加载完成后设置 MaxHeight
+    /// 这是解决滚轮问题的关键：限制 ScrollViewer 的高度，使 ScrollableHeight > 0
+    /// </summary>
+    private void MainScrollViewer_Loaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is ScrollViewer sv)
+        {
+            // 获取主窗口高度
+            var mainWindow = System.Windows.Application.Current.MainWindow;
+            if (mainWindow != null && mainWindow.ActualHeight > 0)
+            {
+                // 计算允许的最大高度（窗口高度减去标题栏和导航栏等）
+                double maxAllowedHeight = mainWindow.ActualHeight - 150;
+                sv.MaxHeight = maxAllowedHeight;
+                
+                // 强制 WPF 重新计算布局，使 ViewportHeight 正确更新
+                sv.InvalidateMeasure();
+                sv.UpdateLayout();
+            }
+            
+            // 监听窗口大小变化，动态调整 MaxHeight
+            if (mainWindow != null)
+            {
+                mainWindow.SizeChanged += (s, args) =>
+                {
+                    if (args.HeightChanged && mainWindow.ActualHeight > 0)
+                    {
+                        double newMaxHeight = mainWindow.ActualHeight - 150;
+                        sv.MaxHeight = newMaxHeight;
+                        sv.InvalidateMeasure();
+                        sv.UpdateLayout();
+                    }
+                };
+            }
+        }
     }
 
     #region 需求 6.3: 输入验证
@@ -195,6 +244,176 @@ public partial class SettingsPage : Page
     private static void HideValidationError(TextBlock errorTextBlock)
     {
         errorTextBlock.Visibility = Visibility.Collapsed;
+    }
+
+
+    /// <summary>
+    /// 按键最小延迟验证 (0-500ms)
+    /// </summary>
+    private void KeyPressMinDelayTextBox_LostFocus(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Wpf.Ui.Controls.TextBox textBox) return;
+        
+        var (isValid, errorMessage, correctedValue) = ValidateNumericInput(
+            textBox.Text, 
+            minValue: 0, 
+            maxValue: 500, 
+            fieldName: "按键最小延迟");
+        
+        if (!isValid)
+        {
+            ShowValidationError(KeyPressMinDelayError, errorMessage);
+            if (correctedValue.HasValue)
+            {
+                ViewModel.AppSettings.KeyPressMinDelayMs = correctedValue.Value;
+            }
+        }
+        else
+        {
+            HideValidationError(KeyPressMinDelayError);
+        }
+    }
+
+    /// <summary>
+    /// 按键最大延迟验证 (0-1000ms)
+    /// </summary>
+    private void KeyPressMaxDelayTextBox_LostFocus(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Wpf.Ui.Controls.TextBox textBox) return;
+        
+        var (isValid, errorMessage, correctedValue) = ValidateNumericInput(
+            textBox.Text, 
+            minValue: 0, 
+            maxValue: 1000, 
+            fieldName: "按键最大延迟");
+        
+        if (!isValid)
+        {
+            ShowValidationError(KeyPressMaxDelayError, errorMessage);
+            if (correctedValue.HasValue)
+            {
+                ViewModel.AppSettings.KeyPressMaxDelayMs = correctedValue.Value;
+            }
+        }
+        else
+        {
+            HideValidationError(KeyPressMaxDelayError);
+            
+            // 确保最大延迟 >= 最小延迟
+            if (ViewModel.AppSettings.KeyPressMaxDelayMs < ViewModel.AppSettings.KeyPressMinDelayMs)
+            {
+                ViewModel.AppSettings.KeyPressMaxDelayMs = ViewModel.AppSettings.KeyPressMinDelayMs;
+                ShowValidationError(KeyPressMaxDelayError, "最大延迟不能小于最小延迟，已自动修正");
+            }
+        }
+    }
+
+    /// <summary>
+    /// 最小按键间隔验证 (0-200ms)
+    /// </summary>
+    private void MinInterKeyDelayTextBox_LostFocus(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Wpf.Ui.Controls.TextBox textBox) return;
+        
+        var (isValid, errorMessage, correctedValue) = ValidateNumericInput(
+            textBox.Text, 
+            minValue: 0, 
+            maxValue: 200, 
+            fieldName: "最小按键间隔");
+        
+        if (!isValid)
+        {
+            ShowValidationError(MinInterKeyDelayError, errorMessage);
+            if (correctedValue.HasValue)
+            {
+                ViewModel.AppSettings.MinInterKeyDelayMs = correctedValue.Value;
+            }
+        }
+        else
+        {
+            HideValidationError(MinInterKeyDelayError);
+        }
+    }
+
+    /// <summary>
+    /// 贝塞尔曲线步数验证 (5-100)
+    /// </summary>
+    private void BezierMouseStepsTextBox_LostFocus(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Wpf.Ui.Controls.TextBox textBox) return;
+        
+        var (isValid, errorMessage, correctedValue) = ValidateNumericInput(
+            textBox.Text, 
+            minValue: 5, 
+            maxValue: 100, 
+            fieldName: "鼠标移动路径点数");
+        
+        if (!isValid)
+        {
+            ShowValidationError(BezierMouseStepsError, errorMessage);
+            if (correctedValue.HasValue)
+            {
+                ViewModel.AppSettings.BezierMouseSteps = correctedValue.Value;
+            }
+        }
+        else
+        {
+            HideValidationError(BezierMouseStepsError);
+        }
+    }
+
+    /// <summary>
+    /// 重连间隔验证 (500-30000ms)
+    /// </summary>
+    private void ReconnectRetryIntervalTextBox_LostFocus(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Wpf.Ui.Controls.TextBox textBox) return;
+        
+        var (isValid, errorMessage, correctedValue) = ValidateNumericInput(
+            textBox.Text, 
+            minValue: 500, 
+            maxValue: 30000, 
+            fieldName: "重连间隔");
+        
+        if (!isValid)
+        {
+            ShowValidationError(ReconnectRetryIntervalError, errorMessage);
+            if (correctedValue.HasValue)
+            {
+                ViewModel.AppSettings.ReconnectRetryIntervalMs = correctedValue.Value;
+            }
+        }
+        else
+        {
+            HideValidationError(ReconnectRetryIntervalError);
+        }
+    }
+
+    /// <summary>
+    /// 最大重试次数验证 (0-100, 0=无限)
+    /// </summary>
+    private void ReconnectMaxRetriesTextBox_LostFocus(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Wpf.Ui.Controls.TextBox textBox) return;
+        
+        var (isValid, errorMessage, correctedValue) = ValidateNumericInput(
+            textBox.Text, 
+            minValue: 0, 
+            maxValue: 100, 
+            fieldName: "最大重试次数");
+        
+        if (!isValid)
+        {
+            ShowValidationError(ReconnectMaxRetriesError, errorMessage);
+            if (correctedValue.HasValue)
+            {
+                ViewModel.AppSettings.ReconnectMaxRetries = correctedValue.Value;
+            }
+        }
+        else
+        {
+            HideValidationError(ReconnectMaxRetriesError);
+        }
     }
 
     #endregion

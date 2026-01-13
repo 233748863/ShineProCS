@@ -18,6 +18,12 @@ public class SkillRuntimeState
     /// Requirements 5.1: 用于检测 IsVisuallyReady 从 false 变为 true
     /// </summary>
     public bool WasVisuallyReady { get; set; } = true;
+    
+    /// <summary>
+    /// 是否因为 CD 而跳过视觉检测
+    /// 需求 1.3: 当技能处于冷却中（剩余 CD > 0.5秒）时，跳过该技能的视觉检测
+    /// </summary>
+    public bool SkippedByCD { get; set; } = false;
 
     /// <summary>
     /// 构造函数

@@ -11,9 +11,12 @@
     <!-- 
     需求 4: 技能配置页
     需求 13.3: 使用统一的页面边距
+    
+    注意：使用 Grid 包裹并设置 VerticalAlignment="Stretch" 确保内容填充整个可用高度
+    这样左侧 Card 的 Grid.Row="*" 才能正确计算高度
     -->
     
-    <Grid Margin="{StaticResource PageMargin}">
-        <local:SkillConfigPage x:Name="SkillConfigPageControl"/>
+    <Grid Margin="{StaticResource PageMargin}" VerticalAlignment="Stretch">
+        <local:SkillConfigPage x:Name="SkillConfigPageControl" VerticalAlignment="Stretch"/>
     </Grid>
 </Page>

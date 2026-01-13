@@ -459,6 +459,8 @@ public class SkillLoopEngine
     /// <summary>
     /// 检测帧是否未发生变化
     /// 通过采样像素值的总和变化来判断帧是否有变化
+    /// 需求 1.1: 使用可配置的采样步长减少计算量
+    /// 需求 1.5: 维护帧差分缓存以避免重复处理未变化的帧
     /// </summary>
     /// <param name="frame">当前帧</param>
     /// <returns>true 表示帧未变化，false 表示帧已变化或检测被禁用</returns>
@@ -466,7 +468,7 @@ public class SkillLoopEngine
     {
         try
         {
-            // Requirements 8.1, 8.2: 从配置读取阈值，阈值为0时禁用检测
+            // 需求 1.1: 从配置读取阈值，阈值为0时禁用检测
             var configThreshold = _config.AppSettings.FrameChangeThreshold;
             if (configThreshold <= 0)
             {
@@ -474,38 +476,48 @@ public class SkillLoopEngine
                 return false;
             }
             
+            // 需求 1.1: 从配置读取采样步长，使用可配置值减少计算量
+            var sampleStride = _config.AppSettings.FrameSampleStride;
+            if (sampleStride <= 0) sampleStride = EngineConst.FrameSampleStride; // 使用默认值
+            
             int sum = 0;
             int width = frame.Width;
             int height = frame.Height;
             int channels = frame.Channels();
             
+            // 优化：使用 unsafe 指针访问提高性能
             unsafe
             {
                 var ptr = (byte*)frame.DataPointer;
                 int stride = (int)frame.Step();
                 
-                for (int y = 0; y < height; y += EngineConst.FrameSampleStride)
+                // 使用配置的采样步长进行稀疏采样
+                for (int y = 0; y < height; y += sampleStride)
                 {
                     var row = ptr + y * stride;
-                    for (int x = 0; x < width; x += EngineConst.FrameSampleStride)
+                    for (int x = 0; x < width; x += sampleStride)
                     {
                         int offset = x * channels;
+                        // 累加 RGB 三通道值
                         sum += row[offset] + row[offset + 1] + row[offset + 2];
                     }
                 }
             }
             
+            // 计算与上一帧的差异
             int diff = Math.Abs(sum - _lastSampleSum);
             _lastSampleSum = sum;
             
-            int sampleCount = (width / EngineConst.FrameSampleStride) * (height / EngineConst.FrameSampleStride);
-            // 使用配置的阈值替代硬编码的15
+            // 计算采样点数量，用于归一化阈值
+            int sampleCount = ((width + sampleStride - 1) / sampleStride) * ((height + sampleStride - 1) / sampleStride);
+            // 使用配置的阈值乘以采样点数量作为最终阈值
             int threshold = sampleCount * configThreshold;
             
             return diff < threshold;
         }
         catch
         {
+            // 发生异常时返回 false，表示帧已变化，确保不会跳过处理
             return false;
         }
     }

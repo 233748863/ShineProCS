@@ -145,6 +145,52 @@ public partial class AppSettings : ObservableObject
     
     #endregion
     
+    #region 血条/蓝条采样检测配置（需求 3.1-3.5）
+    
+    /// <summary>
+    /// 红色血条 R 通道最小值
+    /// 需求 3.3: 可配置的颜色阈值
+    /// </summary>
+    [ObservableProperty] private int _healthRedMinR = 150;
+    
+    /// <summary>
+    /// 红色血条 R-G 最小差值
+    /// 需求 3.3: 可配置的颜色阈值
+    /// </summary>
+    [ObservableProperty] private int _healthRedRGDiff = 30;
+    
+    /// <summary>
+    /// 红色血条 R-B 最小差值
+    /// 需求 3.3: 可配置的颜色阈值
+    /// </summary>
+    [ObservableProperty] private int _healthRedRBDiff = 30;
+    
+    /// <summary>
+    /// 绿色血条 G 通道最小值
+    /// 需求 3.4: 同时识别红色和绿色配色方案
+    /// </summary>
+    [ObservableProperty] private int _healthGreenMinG = 100;
+    
+    /// <summary>
+    /// 蓝条 B 通道最小值
+    /// 需求 3.3: 可配置的颜色阈值
+    /// </summary>
+    [ObservableProperty] private int _manaBlueMinB = 100;
+    
+    /// <summary>
+    /// 蓝条 B-G 容差
+    /// 需求 3.3: 可配置的颜色阈值
+    /// </summary>
+    [ObservableProperty] private int _manaBlueBGTolerance = 30;
+    
+    /// <summary>
+    /// HP/MP 检测最大连续失败次数
+    /// 需求 3.5: 超过此值后使用缓存值
+    /// </summary>
+    [ObservableProperty] private int _barDetectionMaxFailures = 5;
+    
+    #endregion
+    
     #region 悬浮窗配置
     
     [ObservableProperty] private double _overlayLeft = 10;
@@ -246,6 +292,90 @@ public partial class AppSettings : ObservableObject
     
     #endregion
     
+    #region GhostBox 输入延迟配置（需求 6.1, 6.2, 6.6）
+    
+    /// <summary>
+    /// 是否启用随机延迟
+    /// 需求 6.1: 支持可配置的输入延迟随机化
+    /// </summary>
+    [ObservableProperty] private bool _enableRandomDelay = true;
+    
+    /// <summary>
+    /// 按键最小延迟（毫秒）
+    /// 需求 6.2: 在配置范围内添加随机延迟
+    /// </summary>
+    [ObservableProperty] private int _keyPressMinDelayMs = 30;
+    
+    /// <summary>
+    /// 按键最大延迟（毫秒）
+    /// 需求 6.2: 在配置范围内添加随机延迟
+    /// </summary>
+    [ObservableProperty] private int _keyPressMaxDelayMs = 80;
+    
+    /// <summary>
+    /// 最小按键间隔（毫秒）
+    /// 需求 6.6: 强制执行最小按键间隔
+    /// </summary>
+    [ObservableProperty] private int _minInterKeyDelayMs = 20;
+    
+    /// <summary>
+    /// 鼠标移动是否使用贝塞尔曲线
+    /// 需求 6.3: 支持贝塞尔曲线鼠标移动以模拟人类动作
+    /// </summary>
+    [ObservableProperty] private bool _useBezierMouseMove = true;
+    
+    /// <summary>
+    /// 贝塞尔曲线路径点数量
+    /// 需求 6.3: 控制鼠标移动的平滑度
+    /// </summary>
+    [ObservableProperty] private int _bezierMouseSteps = 20;
+    
+    #endregion
+    
+    #region GhostBox 重连配置（需求 6.4, 6.5）
+    
+    /// <summary>
+    /// 是否启用自动重连
+    /// 需求 6.5: 支持自动重连尝试
+    /// </summary>
+    [ObservableProperty] private bool _enableAutoReconnect = true;
+    
+    /// <summary>
+    /// 重连间隔（毫秒）
+    /// 需求 6.5: 重试间隔可配置
+    /// </summary>
+    [ObservableProperty] private int _reconnectRetryIntervalMs = 2000;
+    
+    /// <summary>
+    /// 最大重试次数（0 = 无限）
+    /// 需求 6.5: 支持自动重连尝试
+    /// </summary>
+    [ObservableProperty] private int _reconnectMaxRetries = 5;
+    
+    #endregion
+    
+    #region 硬件加速配置（需求 5.1, 5.5）
+    
+    /// <summary>
+    /// 推理设备类型 (0=CPU, 1=DirectML GPU)
+    /// 需求 5.1: 支持两种推理设备类型
+    /// </summary>
+    [ObservableProperty] private int _inferenceDeviceType = 0;
+    
+    /// <summary>
+    /// GPU 设备 ID（多 GPU 系统可指定）
+    /// 需求 5.1: DirectML 设备 ID
+    /// </summary>
+    [ObservableProperty] private int _gpuDeviceId = 0;
+    
+    /// <summary>
+    /// 是否强制 OCR 使用 CPU
+    /// 需求 5.5: 允许强制 OCR 使用 CPU
+    /// </summary>
+    [ObservableProperty] private bool _cpuOcr = false;
+    
+    #endregion
+    
 
     
 
@@ -254,8 +384,15 @@ public partial class AppSettings : ObservableObject
     
     /// <summary>
     /// 帧变化检测阈值 (0=禁用检测, 默认15)
+    /// 需求 1.1: 可配置的帧变化检测阈值
     /// </summary>
     [ObservableProperty] private int _frameChangeThreshold = 15;
+    
+    /// <summary>
+    /// 帧采样步长 (默认16，值越大采样越稀疏，性能越好但精度越低)
+    /// 需求 1.1: 可配置的采样步长减少计算量
+    /// </summary>
+    [ObservableProperty] private int _frameSampleStride = 16;
     
     /// <summary>
     /// 公共CD检测模式 (0=自动, 1=颜色, 2=亮度)
@@ -271,6 +408,38 @@ public partial class AppSettings : ObservableObject
     /// 模板缓存大小
     /// </summary>
     [ObservableProperty] private int _templateCacheSize = 50;
+    
+    /// <summary>
+    /// 是否启用模板匹配缩放优化
+    /// 需求 1.4: 可选地将图像缩放以加速匹配
+    /// </summary>
+    [ObservableProperty] private bool _enableTemplateScaling = true;
+    
+    /// <summary>
+    /// 模板匹配缩放比例 (0.25-1.0, 默认0.5)
+    /// 需求 1.4: 可配置的缩放比例
+    /// 值越小匹配越快但精度越低
+    /// </summary>
+    [ObservableProperty] private double _templateScaleFactor = 0.5;
+    
+    /// <summary>
+    /// 缩放后的相似度阈值调整值 (默认0.05)
+    /// 缩放后匹配精度略有下降，阈值降低此值进行补偿
+    /// </summary>
+    [ObservableProperty] private double _templateScaleThresholdAdjust = 0.05;
+    
+    /// <summary>
+    /// 最小缩放后尺寸 (像素)
+    /// 如果缩放后尺寸小于此值，则不进行缩放
+    /// </summary>
+    [ObservableProperty] private int _templateMinScaledSize = 16;
+    
+    /// <summary>
+    /// 是否启用 Buff 多尺度模板匹配
+    /// 需求 2.3: 支持多尺度匹配以适应不同 UI 缩放
+    /// 启用后会在 0.8-1.2 倍缩放范围内搜索最佳匹配
+    /// </summary>
+    [ObservableProperty] private bool _enableMultiScaleBuffMatch = false;
     
     #endregion
 }

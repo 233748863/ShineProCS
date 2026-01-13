@@ -54,8 +54,8 @@ public class YoloPredictor : IYoloService
     {
         _logger = logger;
         _onnxFactory = onnxFactory;
-        UseGpu = _onnxFactory.ProviderTypes.Any(p => 
-            p == ProviderType.Dml || p == ProviderType.Cuda || p == ProviderType.TensorRt);
+        // 简化后只检查 DirectML，因为只支持 CPU 和 DirectML 两种模式
+        UseGpu = _onnxFactory.ProviderTypes.Any(p => p == ProviderType.Dml);
     }
 
     /// <inheritdoc />

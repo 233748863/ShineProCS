@@ -13,6 +13,8 @@
     <AssemblyName>ShineProCS</AssemblyName>
     <RootNamespace>ShineProCS</RootNamespace>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <!-- 排除测试项目文件夹，避免编译时包含测试代码 -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);ShineProCS.Tests\**\*</DefaultItemExcludes>
   </PropertyGroup>
 
   <ItemGroup>
