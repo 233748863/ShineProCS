@@ -33,3 +33,26 @@ Desktop.ini
 # Backup files
 *.bak
 *~
+
+# PaddleOCR 模型文件（太大，不包含在仓库中）
+Assets/Models/PaddleOCR/**/*.onnx
+Assets/Models/PaddleOCR/**/*.yml
+Assets/Models/PaddleOCR/**/*.png
+!Assets/Models/PaddleOCR/.gitkeep
+!Assets/Models/PaddleOCR/README.md
+!Assets/Models/PaddleOCR/download_models.ps1
+
+# 模型缓存目录
+Cache/
+
+# 测试项目
+Tests/
+
+# 参考项目
+better-genshin-impact/
+
+# 路径示例
+paths/
+
+# Kiro specs (开发文档)
+.kiro/

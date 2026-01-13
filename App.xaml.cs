@@ -1,13 +1,82 @@
 using System.IO;
 using System.Windows;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Serilog;
+using ShineProCS.Core.Config;
+using ShineProCS.Core.Engine;
+using ShineProCS.Core.GameTask.Tasks;
+using ShineProCS.Core.GameTask.Triggers;
+using ShineProCS.Core.Interfaces;
+using ShineProCS.Core.Pathing;
+using ShineProCS.Core.Recognition.OCR;
+using ShineProCS.Core.Recognition.OCR.Paddle;
+using ShineProCS.Core.Recognition.ONNX;
+using ShineProCS.Core.Recognition.YOLO;
+using ShineProCS.Core.Services;
+using ShineProCS.ViewModels;
+using ShineProCS.Views;
+using ShineProCS.Views.Pages;
+using Wpf.Ui;
+using Wpf.Ui.DependencyInjection;
 
 namespace ShineProCS;
 
+/// <summary>
+/// 应用程序入口
+/// 使用 Microsoft.Extensions.Hosting 进行应用程序生命周期管理
+/// 使用依赖注入管理所有服务、ViewModel 和页面
+/// 需求: 7.1, 7.2, 7.3, 7.4, 7.5
+/// </summary>
 public partial class App : System.Windows.Application
 {
     private static readonly string LogPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs");
     
-    protected override void OnStartup(StartupEventArgs e)
+    /// <summary>
+    /// 应用程序主机
+    /// </summary>
+    private static IHost? _host;
+    
+    /// <summary>
+    /// 获取服务提供者
+    /// </summary>
+    public static IServiceProvider Services => _host?.Services 
+        ?? throw new InvalidOperationException("应用程序主机未初始化");
+    
+    /// <summary>
+    /// 获取指定类型的服务
+    /// </summary>
+    /// <typeparam name="T">服务类型</typeparam>
+    /// <returns>服务实例</returns>
+    public static T GetService<T>() where T : class
+    {
+        return Services.GetRequiredService<T>();
+    }
+    
+    /// <summary>
+    /// 尝试获取指定类型的服务
+    /// </summary>
+    /// <typeparam name="T">服务类型</typeparam>
+    /// <returns>服务实例，如果未注册则返回 null</returns>
+    public static T? GetServiceOrDefault<T>() where T : class
+    {
+        return Services.GetService<T>();
+    }
+    
+    /// <summary>
+    /// 获取指定类型的 Logger
+    /// </summary>
+    /// <typeparam name="T">日志类型</typeparam>
+    /// <returns>Logger 实例</returns>
+    public static Microsoft.Extensions.Logging.ILogger<T> GetLogger<T>()
+    {
+        return Services.GetRequiredService<Microsoft.Extensions.Logging.ILogger<T>>();
+    }
+    
+    /// <summary>
+    /// 应用程序启动
+    /// </summary>
+    protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
         
@@ -15,6 +84,194 @@ public partial class App : System.Windows.Application
         if (!Directory.Exists(LogPath))
             Directory.CreateDirectory(LogPath);
         
+        // 配置全局异常处理
+        ConfigureExceptionHandling();
+        
+        // 构建并启动主机
+        _host = CreateHostBuilder().Build();
+        
+        // 初始化页面服务的服务提供者
+        var pageService = _host.Services.GetRequiredService<IPageService>();
+        pageService.SetServiceProvider(_host.Services);
+        
+        // 配置导航页面提供者
+        var navigationWindow = _host.Services.GetRequiredService<MainWindow>();
+        navigationWindow.SetPageService(_host.Services.GetRequiredService<Wpf.Ui.Abstractions.INavigationViewPageProvider>());
+        
+        await _host.StartAsync();
+        
+        // 显示主窗口
+        navigationWindow.Show();
+    }
+    
+    /// <summary>
+    /// 应用程序退出
+    /// </summary>
+    protected override async void OnExit(ExitEventArgs e)
+    {
+        if (_host != null)
+        {
+            await _host.StopAsync();
+            _host.Dispose();
+            _host = null;
+        }
+        
+        base.OnExit(e);
+    }
+    
+    /// <summary>
+    /// 创建主机构建器
+    /// </summary>
+    private static IHostBuilder CreateHostBuilder()
+    {
+        return Host.CreateDefaultBuilder()
+            .UseSerilog((context, services, configuration) =>
+            {
+                configuration
+                    .MinimumLevel.Debug()
+                    .WriteTo.File(
+                        Path.Combine(LogPath, "app-.log"),
+                        rollingInterval: RollingInterval.Day,
+                        retainedFileCountLimit: 7,
+                        outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff}] [{Level:u3}] {Message:lj}{NewLine}{Exception}",
+                        encoding: System.Text.Encoding.UTF8
+                    );
+            })
+            .ConfigureServices((context, services) =>
+            {
+                // ========== 核心服务（单例） ==========
+                // 需求 7.4: 单例服务
+                services.AddSingleton<IConfigService, ConfigService>();
+                services.AddSingleton<ILogService, LogService>();
+                services.AddSingleton<INotificationService, NotificationService>();
+                services.AddSingleton<IPageService, PageService>();
+                services.AddSingleton<IWindowEnumerationService, WindowEnumerationService>();
+                services.AddSingleton<ConfigManager>();
+                
+                // ========== 迁移服务（单例） ==========
+                // 需求 18.2: 截图服务
+                services.AddSingleton<ICaptureService, CaptureService>();
+                // 需求 18.3: 输入服务
+                services.AddSingleton<IInputService, InputService>();
+                
+                // ========== WPF-UI 服务 ==========
+                // 需求 1.2, 2.1: 导航服务
+                services.AddSingleton<INavigationService, NavigationService>();
+                services.AddSingleton<ISnackbarService, SnackbarService>();
+                services.AddNavigationViewPageProvider();
+                
+                // ========== 任务系统（单例） ==========
+                // 需求 8.3, 8.4, 8.5, 8.6
+                services.AddSingleton<TaskRunner>();
+                services.AddSingleton<TaskTriggerDispatcher>();
+                
+                // ========== 识别服务（单例） ==========
+                // 需求 15.1: OCR 服务
+                // 需求 16.1: YOLO 服务
+                services.AddSingleton<HardwareAccelerationConfig>();
+                services.AddSingleton<BgiOnnxFactory>();
+                services.AddSingleton<IOcrService>(sp =>
+                {
+                    var onnxFactory = sp.GetRequiredService<BgiOnnxFactory>();
+                    // 使用 V4 模型（中英文识别）
+                    return new PaddleOcrService(onnxFactory, PaddleOcrService.PaddleOcrModelType.V4);
+                });
+                services.AddSingleton<IYoloService, YoloService>();
+                
+                // ========== 触发器（单例） ==========
+                // 需求 14.6: 技能循环触发器
+                // 需求 17.1: 自动拾取触发器
+                // 需求 18.1: 自动剧情跳过触发器
+                services.AddSingleton<ShineProCS.Core.GameTask.Triggers.SkillLoopTrigger>(sp =>
+                {
+                    var inputService = sp.GetRequiredService<IInputService>();
+                    var captureService = sp.GetRequiredService<ICaptureService>();
+                    var configManager = sp.GetRequiredService<ConfigManager>();
+                    return new ShineProCS.Core.GameTask.Triggers.SkillLoopTrigger(
+                        inputService.Keyboard,
+                        captureService.GetImageInterface(),
+                        configManager);
+                });
+                services.AddSingleton<AutoPickTrigger>(sp =>
+                {
+                    var inputService = sp.GetRequiredService<IInputService>();
+                    var ocrService = sp.GetService<IOcrService>();
+                    var configManager = sp.GetRequiredService<ConfigManager>();
+                    var logService = sp.GetRequiredService<ILogService>();
+                    return new AutoPickTrigger(inputService, ocrService, configManager, logService);
+                });
+                services.AddSingleton<AutoSkipTrigger>(sp =>
+                {
+                    var inputService = sp.GetRequiredService<IInputService>();
+                    var ocrService = sp.GetService<IOcrService>();
+                    var configManager = sp.GetRequiredService<ConfigManager>();
+                    var logService = sp.GetRequiredService<ILogService>();
+                    return new AutoSkipTrigger(inputService, ocrService, configManager, logService);
+                });
+                
+                // ========== 独立任务（瞬态） ==========
+                // 需求 19.1: 自动秘境任务
+                // 需求 20.1: 地图追踪任务
+                services.AddTransient<AutoDomainTask>(sp =>
+                {
+                    var captureService = sp.GetRequiredService<ICaptureService>();
+                    var inputService = sp.GetRequiredService<IInputService>();
+                    var logService = sp.GetRequiredService<ILogService>();
+                    var notificationService = sp.GetRequiredService<INotificationService>();
+                    var configManager = sp.GetRequiredService<ConfigManager>();
+                    var skillLoopTrigger = sp.GetService<ShineProCS.Core.GameTask.Triggers.SkillLoopTrigger>();
+                    var ocrService = sp.GetService<IOcrService>();
+                    var yoloService = sp.GetService<IYoloService>();
+                    return new AutoDomainTask(
+                        captureService, inputService, logService, notificationService,
+                        configManager, skillLoopTrigger, ocrService, yoloService);
+                });
+                services.AddTransient<PathingTask>(sp =>
+                {
+                    var captureService = sp.GetRequiredService<ICaptureService>();
+                    var inputService = sp.GetRequiredService<IInputService>();
+                    var logService = sp.GetRequiredService<ILogService>();
+                    var notificationService = sp.GetRequiredService<INotificationService>();
+                    var configManager = sp.GetRequiredService<ConfigManager>();
+                    var skillLoopTrigger = sp.GetService<ShineProCS.Core.GameTask.Triggers.SkillLoopTrigger>();
+                    return new PathingTask(
+                        captureService, inputService, logService, notificationService,
+                        configManager, skillLoopTrigger);
+                });
+                services.AddSingleton<PathingService>();
+                
+                // ========== 遮罩窗口 ==========
+                // 需求 21.1: 遮罩窗口
+                services.AddSingleton<MaskWindowViewModel>();
+                services.AddSingleton<MaskWindow>();
+                
+                // ========== ViewModel（单例/瞬态） ==========
+                // 需求 7.2, 7.3: 注册 ViewModel
+                // MainViewModel 作为单例，因为主窗口只有一个
+                services.AddSingleton<MainViewModel>();
+                
+                // ========== 导航页面（瞬态） ==========
+                // 需求 7.5, 2.2: 页面实例作为瞬态，支持 NavigationCacheMode
+                services.AddTransient<HomePage>();
+                services.AddTransient<SkillsPage>();
+                services.AddTransient<BuffsPage>();
+                services.AddTransient<SettingsPage>();
+                
+                // ========== 旧页面控件（瞬态） ==========
+                services.AddTransient<SkillConfigPage>();
+                services.AddTransient<BuffLibraryPage>();
+                
+                // ========== 窗口 ==========
+                // 主窗口作为单例
+                services.AddSingleton<MainWindow>();
+            });
+    }
+    
+    /// <summary>
+    /// 配置全局异常处理
+    /// </summary>
+    private void ConfigureExceptionHandling()
+    {
         // UI 线程异常处理
         DispatcherUnhandledException += (s, args) =>
         {
@@ -44,6 +301,9 @@ public partial class App : System.Windows.Application
         };
     }
     
+    /// <summary>
+    /// 记录异常到日志文件
+    /// </summary>
     private static void LogException(string source, Exception? ex)
     {
         if (ex == null) return;
@@ -66,6 +326,9 @@ public partial class App : System.Windows.Application
 
                 """;
             File.AppendAllText(logFile, logContent);
+            
+            // 同时使用 Serilog 记录
+            Log.Error(ex, "{Source}: {Message}", source, ex.Message);
         }
         catch { /* 日志写入失败时忽略 */ }
     }

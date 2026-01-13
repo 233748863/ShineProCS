@@ -14,17 +14,53 @@
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
   </PropertyGroup>
 
-  <!-- 排除 Tests 文件夹，避免 WPF 临时项目包含测试文件 -->
+  <!-- 排除 Tests 文件夹和 better-genshin-impact 参考源码目录 -->
   <ItemGroup>
     <Compile Remove="Tests\**" />
     <None Remove="Tests\**" />
+    <Compile Remove="better-genshin-impact\**" />
+    <None Remove="better-genshin-impact\**" />
+    <Content Remove="better-genshin-impact\**" />
+    <EmbeddedResource Remove="better-genshin-impact\**" />
+    <Page Remove="better-genshin-impact\**" />
+    <ApplicationDefinition Remove="better-genshin-impact\**" />
   </ItemGroup>
 
   <ItemGroup>
+    <!-- MVVM 工具包 -->
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
-    <PackageReference Include="OpenCvSharp4" Version="4.10.0.20241108" />
-    <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.10.0.20241108" />
-    <PackageReference Include="WPF-UI" Version="3.0.5" />
+    
+    <!-- OpenCV 图像处理 -->
+    <PackageReference Include="OpenCvSharp4" Version="4.11.0.20250507" />
+    <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.11.0.20250507" />
+    
+    <!-- WPF-UI 4.0.x 及扩展包 -->
+    <PackageReference Include="WPF-UI" Version="4.0.2" />
+    <PackageReference Include="WPF-UI.Tray" Version="4.0.2" />
+    <PackageReference Include="WPF-UI.DependencyInjection" Version="4.0.2" />
+    
+    <!-- 依赖注入和应用程序托管 -->
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.3" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.3" />
+    
+    <!-- Serilog 日志框架 -->
+    <PackageReference Include="Serilog" Version="4.2.0" />
+    <PackageReference Include="Serilog.Extensions.Hosting" Version="8.0.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
+    
+    <!-- 拖拽排序支持 -->
+    <PackageReference Include="gong-wpf-dragdrop" Version="3.2.1" />
+    
+    <!-- XAML Behaviors -->
+    <PackageReference Include="Microsoft.Xaml.Behaviors.Wpf" Version="1.1.122" />
+    
+    <!-- ONNX Runtime with DirectML GPU 加速 (用于 OCR 和 YOLO) -->
+    <PackageReference Include="Microsoft.ML.OnnxRuntime.DirectML" Version="1.20.1" />
+    
+    <!-- YAML 配置解析 (用于 PaddleOCR 模型配置) -->
+    <PackageReference Include="YamlDotNet" Version="16.3.0" />
+    <PackageReference Include="YoloSharp" Version="6.0.3" />
   </ItemGroup>
 
   <ItemGroup>
@@ -32,6 +68,10 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="libs\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <!-- PaddleOCR 模型文件 -->
+    <None Update="Assets\Models\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

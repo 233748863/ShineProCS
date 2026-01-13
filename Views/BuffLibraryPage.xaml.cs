@@ -1,5 +1,7 @@
+using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media.Imaging;
 using ShineProCS.Core.Interfaces;
 using ShineProCS.Core.Services;
@@ -7,15 +9,26 @@ using ShineProCS.Models;
 using ShineProCS.ViewModels;
 using WinUserControl = System.Windows.Controls.UserControl;
 using WinApp = System.Windows.Application;
+using WinMessageBox = System.Windows.MessageBox;
 
 namespace ShineProCS.Views;
 
+/// <summary>
+/// Buff库页面
+/// 需求 5.1: 可搜索的Buff列表
+/// 需求 5.2: Buff CRUD操作
+/// 需求 5.3: 按类别和状态筛选
+/// 需求 5.4: 引用计数显示
+/// </summary>
 public partial class BuffLibraryPage : WinUserControl
 {
     private MainViewModel? _viewModel;
     private IImageInterface? _imageInterface;
     private BuffConfig? _selectedBuff;
-    private BuffConfig? _pendingNewBuff; // 待保存的新Buff
+    private BuffConfig? _pendingNewBuff;
+    
+    // 筛选后的Buff列表
+    private ObservableCollection<BuffConfig> _filteredBuffs = [];
     
     public BuffLibraryPage()
     {
@@ -25,23 +38,202 @@ public partial class BuffLibraryPage : WinUserControl
     
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
-        // 从MainWindow获取ViewModel
         if (WinApp.Current.MainWindow is MainWindow mainWindow && 
             mainWindow.DataContext is MainViewModel vm)
         {
             _viewModel = vm;
             _imageInterface = vm.ImageInterface;
             
-            // 绑定到ViewModel的AppSettings.BuffLibrary
-            BuffList.ItemsSource = vm.AppSettings.BuffLibrary;
+            // 初始化筛选列表
+            RefreshFilteredList();
+            BuffList.ItemsSource = _filteredBuffs;
+            
+            // 计算引用计数
+            UpdateAllReferenceCount();
         }
     }
+    
+    #region 搜索和筛选 - 需求 5.1, 5.3
+    
+    /// <summary>
+    /// 搜索框文本变化
+    /// </summary>
+    private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        RefreshFilteredList();
+    }
+    
+    /// <summary>
+    /// 类别筛选变化
+    /// </summary>
+    private void CategoryFilter_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        RefreshFilteredList();
+    }
+    
+    /// <summary>
+    /// 状态筛选变化
+    /// </summary>
+    private void StatusFilter_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        RefreshFilteredList();
+    }
+    
+    /// <summary>
+    /// 刷新筛选后的列表
+    /// </summary>
+    private void RefreshFilteredList()
+    {
+        if (_viewModel == null) return;
+        
+        var searchText = SearchBox?.Text?.Trim().ToLower() ?? "";
+        var categoryTag = (CategoryFilter?.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "All";
+        var statusTag = (StatusFilter?.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "All";
+        
+        var filtered = FilterBuffs(
+            _viewModel.AppSettings.BuffLibrary, 
+            searchText, 
+            categoryTag, 
+            statusTag).ToList();
+        
+        _filteredBuffs.Clear();
+        foreach (var buff in filtered)
+        {
+            _filteredBuffs.Add(buff);
+        }
+        
+        // 更新统计文本
+        var totalCount = _viewModel.AppSettings.BuffLibrary.Count;
+        var filteredCount = _filteredBuffs.Count;
+        FilterResultText.Text = totalCount == filteredCount 
+            ? $"共 {totalCount} 个 Buff" 
+            : $"显示 {filteredCount} / {totalCount} 个 Buff";
+    }
+    
+    /// <summary>
+    /// 筛选Buff列表（供外部调用和测试）
+    /// </summary>
+    public static IEnumerable<BuffConfig> FilterBuffs(
+        IEnumerable<BuffConfig> buffs, 
+        string? searchText, 
+        string? categoryFilter, 
+        string? statusFilter)
+    {
+        return buffs.Where(buff =>
+        {
+            // 搜索过滤
+            if (!string.IsNullOrEmpty(searchText))
+            {
+                var search = searchText.ToLower();
+                var matchName = buff.Name?.ToLower().Contains(search) ?? false;
+                var matchDisplayName = buff.DisplayName?.ToLower().Contains(search) ?? false;
+                var matchDescription = buff.Description?.ToLower().Contains(search) ?? false;
+                if (!matchName && !matchDisplayName && !matchDescription)
+                    return false;
+            }
+            
+            // 类别过滤
+            if (categoryFilter == "Buff" && buff.IsDebuff) return false;
+            if (categoryFilter == "Debuff" && !buff.IsDebuff) return false;
+            
+            // 状态过滤
+            if (statusFilter == "Enabled" && !buff.Enabled) return false;
+            if (statusFilter == "Disabled" && buff.Enabled) return false;
+            if (statusFilter == "Configured" && !buff.IsConfigured) return false;
+            if (statusFilter == "NotConfigured" && buff.IsConfigured) return false;
+            
+            return true;
+        });
+    }
+    
+    #endregion
+    
+    #region 引用计数 - 需求 5.4
+    
+    /// <summary>
+    /// 更新所有Buff的引用计数
+    /// </summary>
+    private void UpdateAllReferenceCount()
+    {
+        if (_viewModel == null) return;
+        
+        // 使用 Skills 属性获取技能列表
+        var skills = _viewModel.Skills;
+        
+        foreach (var buff in _viewModel.AppSettings.BuffLibrary)
+        {
+            UpdateBuffReferenceCount(buff, skills);
+        }
+    }
+    
+    /// <summary>
+    /// 更新单个Buff的引用计数
+    /// </summary>
+    private static void UpdateBuffReferenceCount(BuffConfig buff, IEnumerable<SkillConfig> skills)
+    {
+        var referencingSkills = new List<string>();
+        
+        foreach (var skill in skills)
+        {
+            // 检查技能的条件Buff
+            if (!string.IsNullOrEmpty(skill.ConditionBuff) && skill.ConditionBuff == buff.Name)
+            {
+                referencingSkills.Add(skill.Name);
+            }
+            
+            // 检查技能的排除条件Buff
+            if (!string.IsNullOrEmpty(skill.ExcludeConditionBuff) && skill.ExcludeConditionBuff == buff.Name)
+            {
+                referencingSkills.Add($"{skill.Name} (排除)");
+            }
+            
+            // 检查前置技能条件Buff
+            if (!string.IsNullOrEmpty(skill.PreCastConditionBuff) && skill.PreCastConditionBuff == buff.Name)
+            {
+                referencingSkills.Add($"{skill.Name} (前置)");
+            }
+        }
+        
+        buff.ReferenceCount = referencingSkills.Count;
+        buff.ReferencingSkills = referencingSkills;
+    }
+    
+    /// <summary>
+    /// 计算Buff引用计数（静态方法，供测试使用）
+    /// </summary>
+    public static int CalculateReferenceCount(BuffConfig buff, IEnumerable<SkillConfig> skills)
+    {
+        int count = 0;
+        
+        foreach (var skill in skills)
+        {
+            if (!string.IsNullOrEmpty(skill.ConditionBuff) && skill.ConditionBuff == buff.Name)
+            {
+                count++;
+            }
+            
+            if (!string.IsNullOrEmpty(skill.ExcludeConditionBuff) && skill.ExcludeConditionBuff == buff.Name)
+            {
+                count++;
+            }
+            
+            if (!string.IsNullOrEmpty(skill.PreCastConditionBuff) && skill.PreCastConditionBuff == buff.Name)
+            {
+                count++;
+            }
+        }
+        
+        return count;
+    }
+    
+    #endregion
+    
+    #region CRUD 操作 - 需求 5.2
     
     private void AddBuff_Click(object sender, RoutedEventArgs e)
     {
         if (_viewModel == null) return;
         
-        // 如果有待保存的新Buff，提示先保存
         if (_pendingNewBuff != null)
         {
             ToastManager.Warning("请先保存当前新增的Buff", "提示");
@@ -60,16 +252,15 @@ public partial class BuffLibraryPage : WinUserControl
         _viewModel.AppSettings.BuffLibrary.Add(newBuff);
         _pendingNewBuff = newBuff;
         
-        // 禁用添加按钮
         AddBuffButton.IsEnabled = false;
         
-        BuffList.Items.Refresh();
+        RefreshFilteredList();
         BuffList.SelectedItem = newBuff;
         
         ToastManager.Info("请编辑后点击保存", "已添加");
     }
     
-    private void BuffList_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    private void BuffList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (BuffList.SelectedItem is BuffConfig buff)
         {
@@ -81,7 +272,6 @@ public partial class BuffLibraryPage : WinUserControl
     {
         _selectedBuff = buff;
         
-        // 填充编辑表单
         BuffNameBox.Text = buff.Name;
         BuffDisplayNameBox.Text = buff.DisplayName;
         BuffDescriptionBox.Text = buff.Description;
@@ -95,12 +285,24 @@ public partial class BuffLibraryPage : WinUserControl
         TemplatePathBox.Text = buff.TemplatePath;
         ThresholdBox.Text = buff.SimilarityThreshold.ToString("F2");
         
-        // 显示模板预览
         UpdateTemplatePreview(buff.TemplatePath);
+        UpdateReferenceInfo(buff);
         
-        // 显示编辑面板
         EditPanel.Visibility = Visibility.Visible;
         EmptyHint.Visibility = Visibility.Collapsed;
+    }
+    
+    private void UpdateReferenceInfo(BuffConfig buff)
+    {
+        if (buff.ReferenceCount > 0)
+        {
+            ReferenceInfoPanel.Visibility = Visibility.Visible;
+            ReferenceSkillsText.Text = string.Join(", ", buff.ReferencingSkills);
+        }
+        else
+        {
+            ReferenceInfoPanel.Visibility = Visibility.Collapsed;
+        }
     }
     
     private void UpdateTemplatePreview(string templatePath)
@@ -134,15 +336,20 @@ public partial class BuffLibraryPage : WinUserControl
     {
         if (sender is FrameworkElement fe && fe.Tag is BuffConfig buff && _viewModel != null)
         {
-            var result = System.Windows.MessageBox.Show(
-                $"确定要删除 \"{buff.DisplayName}\" 吗？\n\n注意：引用此Buff的技能配置将失效。",
+            var warningMessage = $"确定要删除 \"{buff.DisplayName}\" 吗？";
+            if (buff.ReferenceCount > 0)
+            {
+                warningMessage += $"\n\n⚠ 警告：此Buff被 {buff.ReferenceCount} 个技能引用，删除后这些技能的配置将失效。";
+            }
+            
+            var result = WinMessageBox.Show(
+                warningMessage,
                 "确认删除",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Warning);
             
             if (result == MessageBoxResult.Yes)
             {
-                // 如果删除的是待保存的新Buff，清除待保存状态
                 if (buff == _pendingNewBuff)
                 {
                     _pendingNewBuff = null;
@@ -158,12 +365,19 @@ public partial class BuffLibraryPage : WinUserControl
                     EmptyHint.Visibility = Visibility.Visible;
                 }
                 
-                // 立即保存到文件
                 _viewModel.ConfigManager.SaveAppSettings(_viewModel.AppSettings);
                 
-                BuffList.Items.Refresh();
+                RefreshFilteredList();
                 ToastManager.Success($"已删除 {buff.DisplayName}", "删除成功");
             }
+        }
+    }
+    
+    private void BuffEnabled_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_viewModel != null)
+        {
+            _viewModel.ConfigManager.SaveAppSettings(_viewModel.AppSettings);
         }
     }
     
@@ -191,7 +405,6 @@ public partial class BuffLibraryPage : WinUserControl
     {
         if (_selectedBuff == null || _imageInterface == null) return;
         
-        // 解析当前区域
         if (!int.TryParse(RegionX.Text, out int x) ||
             !int.TryParse(RegionY.Text, out int y) ||
             !int.TryParse(RegionW.Text, out int w) ||
@@ -243,7 +456,6 @@ public partial class BuffLibraryPage : WinUserControl
         
         try
         {
-            // 截取当前区域并匹配
             var currentFrame = _imageInterface.GetScreenRegion(x, y, w, h);
             if (currentFrame == null)
             {
@@ -257,7 +469,6 @@ public partial class BuffLibraryPage : WinUserControl
                 var similarity = _imageInterface.MatchTemplate(currentFrame, template);
                 template.Dispose();
                 
-                // 显示高亮
                 RegionHighlightWindow.ShowHighlight(x, y, w, h, 2);
                 
                 if (!double.TryParse(ThresholdBox.Text, out double threshold))
@@ -281,7 +492,6 @@ public partial class BuffLibraryPage : WinUserControl
     {
         if (_selectedBuff == null || _viewModel == null) return;
         
-        // 验证名称
         var name = BuffNameBox.Text.Trim();
         if (string.IsNullOrEmpty(name))
         {
@@ -289,7 +499,6 @@ public partial class BuffLibraryPage : WinUserControl
             return;
         }
         
-        // 检查名称是否重复
         var duplicate = _viewModel.AppSettings.BuffLibrary
             .FirstOrDefault(b => b != _selectedBuff && b.Name == name);
         if (duplicate != null)
@@ -298,7 +507,6 @@ public partial class BuffLibraryPage : WinUserControl
             return;
         }
         
-        // 更新数据
         _selectedBuff.Name = name;
         _selectedBuff.DisplayName = BuffDisplayNameBox.Text.Trim();
         _selectedBuff.Description = BuffDescriptionBox.Text.Trim();
@@ -314,17 +522,17 @@ public partial class BuffLibraryPage : WinUserControl
         if (double.TryParse(ThresholdBox.Text, out double threshold))
             _selectedBuff.SimilarityThreshold = Math.Clamp(threshold, 0.0, 1.0);
         
-        // 保存到文件
         _viewModel.ConfigManager.SaveAppSettings(_viewModel.AppSettings);
         
-        // 如果保存的是待保存的新Buff，清除待保存状态，启用添加按钮
         if (_selectedBuff == _pendingNewBuff)
         {
             _pendingNewBuff = null;
             AddBuffButton.IsEnabled = true;
         }
         
-        BuffList.Items.Refresh();
+        RefreshFilteredList();
         ToastManager.Success($"已保存 {_selectedBuff.DisplayName}", "保存成功");
     }
+    
+    #endregion
 }

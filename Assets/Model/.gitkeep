@@ -1,0 +1,21 @@
+# 模型目录（与 BetterGI 原版一致）
+# 请将模型文件放置到对应子目录中
+
+# YOLO 模型:
+# - Fish/bgi_fish.onnx        钓鱼检测
+# - Domain/bgi_tree.onnx      秘境古树检测
+# - World/bgi_world.onnx      大世界物品检测
+# - Common/avatar_side_classify_sim.onnx  角色识别
+
+# Yap 模型:
+# - Yap/model_training.onnx   文字识别
+
+# PaddleOCR 模型:
+# - PaddleOCR/Det/V4/PP-OCRv4_mobile_det_infer/slim.onnx
+# - PaddleOCR/Det/V5/PP-OCRv5_mobile_det_infer/slim.onnx
+# - PaddleOCR/Rec/V4/PP-OCRv4_mobile_rec_infer/slim.onnx
+# - PaddleOCR/Rec/V4/en_PP-OCRv4_mobile_rec_infer/slim.onnx
+# - PaddleOCR/Rec/V5/PP-OCRv5_mobile_rec_infer/slim.onnx
+# - PaddleOCR/Rec/V5/latin_PP-OCRv5_mobile_rec_infer/slim.onnx
+# - PaddleOCR/Rec/V5/eslav_PP-OCRv5_mobile_rec_infer/slim.onnx
+# - PaddleOCR/Rec/V5/korean_PP-OCRv5_mobile_rec_infer/slim.onnx

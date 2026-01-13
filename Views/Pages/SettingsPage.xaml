@@ -1,0 +1,512 @@
+<Page x:Class="ShineProCS.Views.Pages.SettingsPage"
+         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+         xmlns:utils="clr-namespace:ShineProCS.Utils"
+         Title="设置"
+         ui:Design.Background="{DynamicResource ApplicationBackgroundBrush}"
+         ui:Design.Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+         Foreground="{DynamicResource TextFillColorPrimaryBrush}">
+    
+    <!-- 
+    需求 6: 全局设置页
+    需求 13.3, 13.4, 13.5: 统一间距、Card组件和SymbolIcon使用
+    -->
+    
+    <Page.Resources>
+        <utils:InverseBooleanConverter x:Key="InvBool"/>
+        <utils:KeyCodeToNameConverter x:Key="KeyToName"/>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+        <utils:InverseBoolToVisibilityConverter x:Key="InvBoolToVis"/>
+        <utils:RegionArrayToStringConverter x:Key="RegionArrayToString"/>
+        <utils:PointArrayToStringConverter x:Key="PointArrayToString"/>
+        <utils:ColorToBrushConverter x:Key="ColorToBrush"/>
+    </Page.Resources>
+    
+    <!-- 需求 13.3: 使用统一的页面边距 -->
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="{StaticResource PageMargin}" Padding="0,0,12,0">
+        <StackPanel MaxWidth="700">
+            <TextBlock Text="全局设置" Style="{StaticResource PageTitleStyle}"/>
+            
+            <!-- 需求 6.2: 引擎设置分组 -->
+            <!-- 需求 13.4: 使用 Card 组件分组 -->
+            <ui:Card Margin="{StaticResource CardMargin}">
+                <StackPanel>
+                    <TextBlock Text="引擎设置" Style="{StaticResource SectionTitleStyle}"/>
+                    <Grid Margin="{StaticResource SectionMargin}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Margin="0,0,8,0">
+                            <TextBlock Text="循环间隔 (毫秒)" Style="{StaticResource FieldLabelStyle}"/>
+                            <ui:TextBox x:Name="LoopIntervalTextBox" 
+                                        Text="{Binding AppSettings.LoopInterval, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}"
+                                        PreviewTextInput="NumericTextBox_PreviewTextInput"
+                                        LostFocus="LoopIntervalTextBox_LostFocus"/>
+                            <TextBlock Text="主循环检测间隔，建议50-200ms" Style="{StaticResource HintTextStyle}"/>
+                            <TextBlock x:Name="LoopIntervalError" Style="{StaticResource ValidationErrorStyle}"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                            <TextBlock Text="图像队列容量" Style="{StaticResource FieldLabelStyle}"/>
+                            <ui:TextBox x:Name="ImageQueueCapacityTextBox"
+                                        Text="{Binding AppSettings.ImageQueueCapacity, UpdateSourceTrigger=PropertyChanged}"
+                                        PreviewTextInput="NumericTextBox_PreviewTextInput"
+                                        LostFocus="ImageQueueCapacityTextBox_LostFocus"/>
+                            <TextBlock Text="图像缓冲队列大小，2-10" Style="{StaticResource HintTextStyle}"/>
+                            <TextBlock x:Name="ImageQueueCapacityError" Style="{StaticResource ValidationErrorStyle}"/>
+                        </StackPanel>
+                    </Grid>
+                    <Grid Margin="{StaticResource SectionMargin}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Margin="0,0,8,0">
+                            <TextBlock Text="帧变化检测阈值" Style="{StaticResource FieldLabelStyle}"/>
+                            <ui:TextBox x:Name="FrameChangeThresholdTextBox"
+                                        Text="{Binding AppSettings.FrameChangeThreshold, UpdateSourceTrigger=PropertyChanged}"
+                                        PreviewTextInput="NumericTextBox_PreviewTextInput"
+                                        LostFocus="FrameChangeThresholdTextBox_LostFocus"/>
+                            <TextBlock Text="0=禁用检测，建议10-30" Style="{StaticResource HintTextStyle}"/>
+                            <TextBlock x:Name="FrameChangeThresholdError" Style="{StaticResource ValidationErrorStyle}"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                            <TextBlock Text="模板缓存大小" Style="{StaticResource FieldLabelStyle}"/>
+                            <ui:TextBox x:Name="TemplateCacheSizeTextBox"
+                                        Text="{Binding AppSettings.TemplateCacheSize, UpdateSourceTrigger=PropertyChanged}"
+                                        PreviewTextInput="NumericTextBox_PreviewTextInput"
+                                        LostFocus="TemplateCacheSizeTextBox_LostFocus"/>
+                            <TextBlock Text="模板图片缓存数量，建议20-100" Style="{StaticResource HintTextStyle}"/>
+                            <TextBlock x:Name="TemplateCacheSizeError" Style="{StaticResource ValidationErrorStyle}"/>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </ui:Card>
+            
+            <!-- 需求 6.2: 输入驱动设置分组 -->
+            <ui:Card Margin="{StaticResource CardMargin}">
+                <StackPanel>
+                    <TextBlock Text="输入驱动设置" Style="{StaticResource SectionTitleStyle}"/>
+                    <TextBlock Text="选择键盘/鼠标输入方式，GhostBox 为硬件级模拟" Style="{StaticResource SecondaryTextStyle}" Margin="{StaticResource SectionMargin}"/>
+                    
+                    <Grid Margin="{StaticResource SectionMargin}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="驱动类型" Style="{StaticResource FieldLabelStyle}"/>
+                            <ComboBox SelectedIndex="{Binding SelectedDriverIndex}" Width="250" HorizontalAlignment="Left">
+                                <ComboBoxItem Content="Win32 (软件模拟)"/>
+                                <ComboBoxItem Content="GhostBox (硬件驱动)" IsEnabled="{Binding IsGhostBoxAvailable}"/>
+                            </ComboBox>
+                            <TextBlock Text="Win32 使用系统 API 模拟，GhostBox 使用硬件设备" Style="{StaticResource HintTextStyle}"/>
+                        </StackPanel>
+                    </Grid>
+                    
+                    <!-- GhostBox 连接状态 -->
+                    <Border Style="{StaticResource InfoPanelStyle}" 
+                            Visibility="{Binding IsGhostBoxSelected, Converter={StaticResource BoolToVis}}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="{StaticResource SmallMargin}">
+                                    <TextBlock Text="连接状态: " Foreground="{StaticResource TextSecondaryBrush}"/>
+                                    <TextBlock Text="{Binding GhostBoxConnectionStatus}" FontWeight="SemiBold">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Foreground" Value="{StaticResource ErrorBrush}"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsGhostBoxConnected}" Value="True">
+                                                        <Setter Property="Foreground" Value="{StaticResource SuccessBrush}"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </StackPanel>
+                                <TextBlock Text="{Binding GhostBoxDeviceInfo}" Foreground="{StaticResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeSM}" 
+                                           Visibility="{Binding IsGhostBoxConnected, Converter={StaticResource BoolToVis}}"/>
+                                <TextBlock Text="{Binding GhostBoxErrorMessage}" Foreground="{StaticResource ErrorBrush}" FontSize="{StaticResource FontSizeSM}" TextWrapping="Wrap" 
+                                           Visibility="{Binding HasGhostBoxError, Converter={StaticResource BoolToVis}}"/>
+                            </StackPanel>
+                            <ui:Button Grid.Column="1" Content="重新连接" Height="{StaticResource ButtonHeightMD}" VerticalAlignment="Center" 
+                                       Command="{Binding ReconnectGhostBoxCommand}" Icon="{ui:SymbolIcon ArrowSync20}"/>
+                        </Grid>
+                    </Border>
+                    
+                    <!-- GhostBox 不可用提示 -->
+                    <Border Style="{StaticResource WarningPanelStyle}" 
+                            Visibility="{Binding IsGhostBoxAvailable, Converter={StaticResource InvBoolToVis}}">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:SymbolIcon Symbol="Warning24" Foreground="{StaticResource ErrorBrush}" Margin="0,0,8,0"/>
+                            <TextBlock Text="GhostBox DLL 未找到，请将 gbild32.dll 和 gbild64.dll 放入 libs/ghostbox/ 目录" 
+                                       Foreground="{StaticResource ErrorBrush}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ui:Card>
+            
+            <!-- 需求 6.2: 窗口捕获设置分组 -->
+            <ui:Card Margin="{StaticResource CardMargin}">
+                <StackPanel>
+                    <TextBlock Text="窗口捕获设置" Style="{StaticResource SectionTitleStyle}"/>
+                    <StackPanel Margin="{StaticResource SectionMargin}">
+                        <TextBlock Text="目标窗口" Style="{StaticResource FieldLabelStyle}"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <ComboBox ItemsSource="{Binding WindowList}" 
+                                      SelectedItem="{Binding SelectedWindow}" 
+                                      DisplayMemberPath="DisplayText"
+                                      IsEnabled="{Binding IsRefreshingWindows, Converter={StaticResource InvBool}}"/>
+                            <ui:Button Grid.Column="1" Height="{StaticResource ButtonHeightMD}" Margin="8,0,0,0" 
+                                       Command="{Binding RefreshWindowListCommand}"
+                                       IsEnabled="{Binding IsRefreshingWindows, Converter={StaticResource InvBool}}"
+                                       ToolTip="刷新窗口列表">
+                                <ui:Button.Content>
+                                    <Grid>
+                                        <ui:SymbolIcon Symbol="ArrowSync20" Visibility="{Binding IsRefreshingWindows, Converter={StaticResource InvBoolToVis}}"/>
+                                        <ui:ProgressRing IsIndeterminate="True" Width="16" Height="16" 
+                                                         Visibility="{Binding IsRefreshingWindows, Converter={StaticResource BoolToVis}}"/>
+                                    </Grid>
+                                </ui:Button.Content>
+                            </ui:Button>
+                        </Grid>
+                        <TextBlock Text="从下拉列表选择目标窗口，点击刷新按钮更新列表" Style="{StaticResource HintTextStyle}"/>
+                    </StackPanel>
+                    <ui:ToggleSwitch IsChecked="{Binding AppSettings.EnableWgcCapture}" Content="使用 Windows Graphics Capture" Margin="{StaticResource ItemMargin}"/>
+                    <TextBlock Text="WGC性能更好，但需要Windows 10 1903+，关闭则使用BitBlt" Style="{StaticResource HintTextStyle}"/>
+                </StackPanel>
+            </ui:Card>
+            
+            <!-- 需求 6.2: 检测区域设置分组 -->
+            <ui:Card Margin="{StaticResource CardMargin}">
+                <StackPanel>
+                    <TextBlock Text="检测区域设置" Style="{StaticResource SectionTitleStyle}"/>
+                    <TextBlock Text="配置各种检测区域的屏幕坐标，点击框选按钮在屏幕上选择区域" Style="{StaticResource SecondaryTextStyle}" Margin="{StaticResource SectionMargin}"/>
+                    
+                    <!-- 主检测区域 -->
+                    <Grid Margin="{StaticResource SectionMargin}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="120"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="主检测区域" VerticalAlignment="Center" Style="{StaticResource FieldLabelStyle}" Margin="0"/>
+                        <TextBlock Grid.Column="1" Style="{StaticResource MonoDisplayStyle}"
+                                   Text="{Binding AppSettings.DetectionRegion, Converter={StaticResource RegionArrayToString}}"/>
+                        <ui:Button Grid.Column="2" Content="框选" Height="{StaticResource ButtonHeightMD}" Margin="8,0,0,0"
+                                   Command="{Binding SelectRegionCommand}" CommandParameter="Detection"/>
+                        <ui:Button Grid.Column="3" Content="预览" Height="{StaticResource ButtonHeightMD}" Margin="4,0,0,0"
+                                   Command="{Binding PreviewSettingsRegionCommand}" CommandParameter="Detection"/>
+                    </Grid>
+                    
+                    <!-- 自身血条区域 -->
+                    <Grid Margin="{StaticResource SectionMargin}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="120"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="自身血条区域" VerticalAlignment="Center" Style="{StaticResource FieldLabelStyle}" Margin="0"/>
+                        <TextBlock Grid.Column="1" Style="{StaticResource MonoDisplayStyle}"
+                                   Text="{Binding AppSettings.HealthBarRegion, Converter={StaticResource RegionArrayToString}}"/>
+                        <ui:Button Grid.Column="2" Content="框选" Height="{StaticResource ButtonHeightMD}" Margin="8,0,0,0"
+                                   Command="{Binding SelectRegionCommand}" CommandParameter="HealthBar"/>
+                        <ui:Button Grid.Column="3" Content="预览" Height="{StaticResource ButtonHeightMD}" Margin="4,0,0,0"
+                                   Command="{Binding PreviewSettingsRegionCommand}" CommandParameter="HealthBar"/>
+                        <ui:Button Grid.Column="4" Content="测试" Height="{StaticResource ButtonHeightMD}" Margin="4,0,0,0"
+                                   Command="{Binding TestHpDetectionCommand}"/>
+                    </Grid>
+                    
+                    <!-- 自身蓝条区域 -->
+                    <Grid Margin="{StaticResource SectionMargin}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="120"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="自身蓝条区域" VerticalAlignment="Center" Style="{StaticResource FieldLabelStyle}" Margin="0"/>
+                        <TextBlock Grid.Column="1" Style="{StaticResource MonoDisplayStyle}"
+                                   Text="{Binding AppSettings.ManaBarRegion, Converter={StaticResource RegionArrayToString}}"/>
+                        <ui:Button Grid.Column="2" Content="框选" Height="{StaticResource ButtonHeightMD}" Margin="8,0,0,0"
+                                   Command="{Binding SelectRegionCommand}" CommandParameter="ManaBar"/>
+                        <ui:Button Grid.Column="3" Content="预览" Height="{StaticResource ButtonHeightMD}" Margin="4,0,0,0"
+                                   Command="{Binding PreviewSettingsRegionCommand}" CommandParameter="ManaBar"/>
+                        <ui:Button Grid.Column="4" Content="测试" Height="{StaticResource ButtonHeightMD}" Margin="4,0,0,0"
+                                   Command="{Binding TestMpDetectionCommand}"/>
+                    </Grid>
+                    
+                    <!-- 目标血条区域 -->
+                    <Grid Margin="{StaticResource SectionMargin}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="120"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="目标血条区域" VerticalAlignment="Center" Style="{StaticResource FieldLabelStyle}" Margin="0"/>
+                        <TextBlock Grid.Column="1" Style="{StaticResource MonoDisplayStyle}"
+                                   Text="{Binding AppSettings.TargetHealthBarRegion, Converter={StaticResource RegionArrayToString}}"/>
+                        <ui:Button Grid.Column="2" Content="框选" Height="{StaticResource ButtonHeightMD}" Margin="8,0,0,0"
+                                   Command="{Binding SelectRegionCommand}" CommandParameter="TargetHealthBar"/>
+                        <ui:Button Grid.Column="3" Content="预览" Height="{StaticResource ButtonHeightMD}" Margin="4,0,0,0"
+                                   Command="{Binding PreviewSettingsRegionCommand}" CommandParameter="TargetHealthBar"/>
+                        <ui:Button Grid.Column="4" Content="测试" Height="{StaticResource ButtonHeightMD}" Margin="4,0,0,0"
+                                   Command="{Binding TestTargetHpDetectionCommand}"/>
+                    </Grid>
+                    
+                    <!-- 公共CD检测点 -->
+                    <Grid Margin="{StaticResource ItemMargin}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="120"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="公共CD检测点" VerticalAlignment="Center" Style="{StaticResource FieldLabelStyle}" Margin="0"/>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource MonoDisplayStyle}"
+                                       Text="{Binding AppSettings.GlobalCdPoint, Converter={StaticResource PointArrayToString}}"/>
+                            <Border Background="{Binding GlobalCdPreviewColor, Converter={StaticResource ColorToBrush}}" 
+                                    Width="20" Height="20" CornerRadius="3" Margin="8,0,0,0" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"/>
+                        </StackPanel>
+                        <ui:Button Grid.Column="2" Content="选点" Height="{StaticResource ButtonHeightMD}" Margin="8,0,0,0"
+                                   Command="{Binding SelectPointCommand}" CommandParameter="GlobalCd"/>
+                        <ui:Button Grid.Column="3" Content="取色" Height="{StaticResource ButtonHeightMD}" Margin="4,0,0,0"
+                                   Command="{Binding PickGlobalCdColorCommand}"/>
+                        <ui:Button Grid.Column="4" Content="测试" Height="{StaticResource ButtonHeightMD}" Margin="4,0,0,0"
+                                   Command="{Binding TestGlobalCdCommand}"/>
+                    </Grid>
+                    <TextBlock Text="公共CD检测点用于判断技能是否在公共冷却中" Style="{StaticResource HintTextStyle}"/>
+                </StackPanel>
+            </ui:Card>
+            
+            <!-- 全局快捷键设置 -->
+            <ui:Card Margin="{StaticResource CardMargin}">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="{StaticResource SectionMargin}">
+                        <TextBlock Text="全局快捷键" Style="{StaticResource SectionTitleStyle}" Margin="0"/>
+                        <ui:ToggleSwitch IsChecked="{Binding AppSettings.EnableGlobalHotkeys}" Content="启用" Margin="16,0,0,0"/>
+                    </StackPanel>
+                    <TextBlock Text="快捷键在游戏窗口中也能响应" Style="{StaticResource HintTextStyle}" Margin="{StaticResource SectionMargin}"/>
+                    
+                    <!-- 启动/停止快捷键 -->
+                    <Grid Margin="{StaticResource ItemMargin}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="120"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="启动/停止" VerticalAlignment="Center"/>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                            <ComboBox Width="80" SelectedIndex="{Binding StartStopModifierIndex}" Margin="0,0,8,0">
+                                <ComboBoxItem Content="无"/>
+                                <ComboBoxItem Content="Ctrl"/>
+                                <ComboBoxItem Content="Alt"/>
+                                <ComboBoxItem Content="Shift"/>
+                            </ComboBox>
+                            <TextBlock Text="+" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <Border Background="{StaticResource BorderBrush}" CornerRadius="4" Padding="12,6" MinWidth="60">
+                                <TextBlock Text="{Binding AppSettings.HotkeyStartStopKey, Converter={StaticResource KeyToName}}" HorizontalAlignment="Center"/>
+                            </Border>
+                        </StackPanel>
+                        <ui:Button Grid.Column="2" Content="设置" Height="{StaticResource ButtonHeightMD}" Margin="8,0,0,0" 
+                                   Command="{Binding CaptureHotkeyCommand}" CommandParameter="StartStop"/>
+                    </Grid>
+                    
+                    <!-- 暂停快捷键 -->
+                    <Grid Margin="{StaticResource ItemMargin}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="120"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="暂停/恢复" VerticalAlignment="Center"/>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                            <ComboBox Width="80" SelectedIndex="{Binding PauseModifierIndex}" Margin="0,0,8,0">
+                                <ComboBoxItem Content="无"/>
+                                <ComboBoxItem Content="Ctrl"/>
+                                <ComboBoxItem Content="Alt"/>
+                                <ComboBoxItem Content="Shift"/>
+                            </ComboBox>
+                            <TextBlock Text="+" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <Border Background="{StaticResource BorderBrush}" CornerRadius="4" Padding="12,6" MinWidth="60">
+                                <TextBlock Text="{Binding AppSettings.HotkeyPauseKey, Converter={StaticResource KeyToName}}" HorizontalAlignment="Center"/>
+                            </Border>
+                        </StackPanel>
+                        <ui:Button Grid.Column="2" Content="设置" Height="{StaticResource ButtonHeightMD}" Margin="8,0,0,0" 
+                                   Command="{Binding CaptureHotkeyCommand}" CommandParameter="Pause"/>
+                    </Grid>
+                    
+                    <ui:Button Content="重新注册快捷键" Command="{Binding ReregisterHotkeysCommand}" Margin="0,8,0,0"/>
+                </StackPanel>
+            </ui:Card>
+            
+            <!-- 需求 17.1, 17.3, 18.5: 触发器配置 -->
+            <ui:Card Margin="{StaticResource CardMargin}">
+                <StackPanel>
+                    <TextBlock Text="触发器配置" Style="{StaticResource SectionTitleStyle}"/>
+                    <TextBlock Text="配置自动触发器的启用状态和参数" Style="{StaticResource SecondaryTextStyle}" Margin="{StaticResource SectionMargin}"/>
+                    
+                    <!-- 自动拾取配置 -->
+                    <Border Style="{StaticResource InfoPanelStyle}" Margin="{StaticResource SectionMargin}">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="{StaticResource SmallMargin}">
+                                <ui:SymbolIcon Symbol="HandRight24" Margin="0,0,8,0"/>
+                                <TextBlock Text="自动拾取" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                <ui:ToggleSwitch IsChecked="{Binding AppSettings.EnableAutoPick}" Margin="16,0,0,0"/>
+                            </StackPanel>
+                            <TextBlock Text="检测到可拾取物品时自动按 F 键拾取" Style="{StaticResource HintTextStyle}"/>
+                            
+                            <!-- 自动拾取详细配置 -->
+                            <StackPanel Visibility="{Binding AppSettings.EnableAutoPick, Converter={StaticResource BoolToVis}}" Margin="0,8,0,0">
+                                <Grid Margin="{StaticResource SmallMargin}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="100"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="触发间隔" VerticalAlignment="Center"/>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                        <ui:TextBox Text="{Binding AppSettings.AutoPickInterval, UpdateSourceTrigger=PropertyChanged}" 
+                                                    Width="80" PreviewTextInput="NumericTextBox_PreviewTextInput"/>
+                                        <TextBlock Text="毫秒" VerticalAlignment="Center" Margin="8,0,0,0" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                    </StackPanel>
+                                </Grid>
+                                
+                                <Grid Margin="{StaticResource SmallMargin}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="100"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="置信度阈值" VerticalAlignment="Center"/>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                        <ui:TextBox Text="{Binding AppSettings.AutoPickConfidenceThreshold, UpdateSourceTrigger=PropertyChanged, StringFormat=F2}" 
+                                                    Width="80"/>
+                                        <TextBlock Text="(0.0-1.0)" VerticalAlignment="Center" Margin="8,0,0,0" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                    </StackPanel>
+                                </Grid>
+                                
+                                <!-- 白名单配置 -->
+                                <Expander Header="白名单配置（为空时拾取所有）" Margin="0,8,0,0">
+                                    <StackPanel Margin="0,8,0,0">
+                                        <TextBlock Text="每行一个物品名称，留空表示拾取所有物品" Style="{StaticResource HintTextStyle}"/>
+                                        <ui:TextBox x:Name="AutoPickWhitelistTextBox" 
+                                                    Text="{Binding AutoPickWhitelistText, UpdateSourceTrigger=LostFocus}"
+                                                    AcceptsReturn="True" TextWrapping="Wrap" Height="80" Margin="0,4,0,0"/>
+                                    </StackPanel>
+                                </Expander>
+                                
+                                <!-- 黑名单配置 -->
+                                <Expander Header="黑名单配置" Margin="0,4,0,0">
+                                    <StackPanel Margin="0,8,0,0">
+                                        <TextBlock Text="每行一个物品名称，匹配的物品将不会被拾取" Style="{StaticResource HintTextStyle}"/>
+                                        <ui:TextBox x:Name="AutoPickBlacklistTextBox" 
+                                                    Text="{Binding AutoPickBlacklistText, UpdateSourceTrigger=LostFocus}"
+                                                    AcceptsReturn="True" TextWrapping="Wrap" Height="80" Margin="0,4,0,0"/>
+                                    </StackPanel>
+                                </Expander>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                    
+                    <!-- 自动剧情跳过配置 -->
+                    <Border Style="{StaticResource InfoPanelStyle}" Margin="{StaticResource SectionMargin}">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="{StaticResource SmallMargin}">
+                                <ui:SymbolIcon Symbol="FastForward24" Margin="0,0,8,0"/>
+                                <TextBlock Text="自动剧情跳过" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                <ui:ToggleSwitch IsChecked="{Binding AppSettings.EnableAutoSkip}" Margin="16,0,0,0"/>
+                            </StackPanel>
+                            <TextBlock Text="检测到对话框时自动点击跳过或继续" Style="{StaticResource HintTextStyle}"/>
+                            
+                            <!-- 自动剧情跳过详细配置 -->
+                            <StackPanel Visibility="{Binding AppSettings.EnableAutoSkip, Converter={StaticResource BoolToVis}}" Margin="0,8,0,0">
+                                <Grid Margin="{StaticResource SmallMargin}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="100"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="触发间隔" VerticalAlignment="Center"/>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                        <ui:TextBox Text="{Binding AppSettings.AutoSkipInterval, UpdateSourceTrigger=PropertyChanged}" 
+                                                    Width="80" PreviewTextInput="NumericTextBox_PreviewTextInput"/>
+                                        <TextBlock Text="毫秒" VerticalAlignment="Center" Margin="8,0,0,0" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                    </StackPanel>
+                                </Grid>
+                                
+                                <Grid Margin="{StaticResource SmallMargin}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="100"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="选项模式" VerticalAlignment="Center"/>
+                                    <ComboBox Grid.Column="1" SelectedIndex="{Binding AppSettings.AutoSkipOptionMode}" Width="150" HorizontalAlignment="Left">
+                                        <ComboBoxItem Content="选择第一个选项"/>
+                                        <ComboBoxItem Content="选择最后一个选项"/>
+                                        <ComboBoxItem Content="随机选择"/>
+                                    </ComboBox>
+                                </Grid>
+                                
+                                <Grid Margin="{StaticResource SmallMargin}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="100"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="检测方式" VerticalAlignment="Center"/>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                        <RadioButton Content="OCR文字识别" IsChecked="{Binding AutoSkipUseOcr}" Margin="0,0,16,0"/>
+                                        <RadioButton Content="模板匹配" IsChecked="{Binding AppSettings.AutoSkipUseTemplateMatch}"/>
+                                    </StackPanel>
+                                </Grid>
+                                
+                                <ui:ToggleSwitch IsChecked="{Binding AppSettings.AutoSkipRunBackground}" 
+                                                 Content="后台运行模式（窗口失去焦点时继续）" Margin="0,4,0,0"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ui:Card>
+            
+            <!-- 需求 6.5: 配置导入导出 -->
+            <!-- 需求 13.5: 使用 SymbolIcon 作为按钮图标 -->
+            <ui:Card Margin="{StaticResource CardMargin}">
+                <StackPanel>
+                    <TextBlock Text="配置导入导出" Style="{StaticResource SectionTitleStyle}"/>
+                    <TextBlock Text="导出配置可用于备份或分享给其他用户" Style="{StaticResource HintTextStyle}" Margin="{StaticResource SectionMargin}"/>
+                    <StackPanel Orientation="Horizontal">
+                        <ui:Button Content="导出全部配置" Command="{Binding ExportConfigCommand}" Margin="0,0,8,0">
+                            <ui:Button.Icon>
+                                <ui:SymbolIcon Symbol="ArrowUpload24"/>
+                            </ui:Button.Icon>
+                        </ui:Button>
+                        <ui:Button Content="导入配置" Command="{Binding ImportConfigCommand}" Margin="0,0,8,0">
+                            <ui:Button.Icon>
+                                <ui:SymbolIcon Symbol="ArrowDownload24"/>
+                            </ui:Button.Icon>
+                        </ui:Button>
+                        <ui:Button Content="导出当前方案" Command="{Binding ExportProfileCommand}"/>
+                    </StackPanel>
+                </StackPanel>
+            </ui:Card>
+            
+            <!-- 保存按钮 -->
+            <ui:Button Content="保存设置" Appearance="Primary" Command="{Binding SaveSettingsCommand}" 
+                       Height="{StaticResource ButtonHeightXL}" HorizontalAlignment="Stretch"/>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

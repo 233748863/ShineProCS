@@ -16,7 +16,7 @@ if (Test-Path $publishDir) {
 
 # 发布单文件（自包含模式，无需安装.NET运行时）
 Write-Host "正在编译发布..." -ForegroundColor Green
-dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o $publishDir
+dotnet publish ShineProCS.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o $publishDir
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "编译失败!" -ForegroundColor Red

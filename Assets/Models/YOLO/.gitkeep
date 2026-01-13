@@ -1,0 +1,12 @@
+# YOLO 模型目录
+# 将 YOLO ONNX 模型文件放置在此目录下
+# 支持的模型格式: YOLOv5, YOLOv8, YOLOv11 的 ONNX 导出版本
+# 
+# 推荐模型:
+# - yolov8n.onnx (轻量级，适合实时检测)
+# - yolov8s.onnx (小型，平衡速度和精度)
+# - yolov8m.onnx (中型，更高精度)
+#
+# 标签文件:
+# 可以在同目录下放置 labels.txt 或 classes.txt 文件
+# 每行一个类别名称

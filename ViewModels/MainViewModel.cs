@@ -73,6 +73,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private bool _showGuideTip;
     [ObservableProperty] private string _hotkeyStatus = "";
     
+    /// <summary>
+    /// 当前页面类型
+    /// 需求: 2.1, 2.4 - 导航一致性和页面状态保持
+    /// </summary>
+    [ObservableProperty] private Type? _currentPageType;
+    
     #region 窗口选择器相关属性
     
     private readonly IWindowEnumerationService _windowEnumerationService;
@@ -321,29 +327,65 @@ public partial class MainViewModel : ObservableObject, IDisposable
         if (!AppSettings.EnableGlobalHotkeys) return;
         
         var registered = new List<string>();
+        var failed = new List<string>();
         
-        if (_hotkeyService.RegisterHotkey("StartStop", 
+        // 检查启动/停止热键冲突
+        var startStopConflict = _hotkeyService.CheckConflict(
+            AppSettings.HotkeyStartStopModifier, 
+            AppSettings.HotkeyStartStopKey, 
+            "StartStop");
+        
+        if (startStopConflict != null && startStopConflict.IsSystemConflict)
+        {
+            OnLog($"启动/停止热键与系统热键冲突: {startStopConflict.Description}", 2);
+            failed.Add("启动/停止");
+        }
+        else if (_hotkeyService.RegisterHotkey("StartStop", 
             AppSettings.HotkeyStartStopModifier, 
             AppSettings.HotkeyStartStopKey, 
             () => { if (IsRunning) StopEngine(); else StartEngine(); }))
         {
-            registered.Add(GlobalHotkeyService.GetHotkeyDisplayText(
+            registered.Add(GlobalHotkeyService.GetHotkeyDisplayTextStatic(
                 AppSettings.HotkeyStartStopModifier, AppSettings.HotkeyStartStopKey));
         }
+        else
+        {
+            failed.Add("启动/停止");
+        }
         
-        if (_hotkeyService.RegisterHotkey("Pause",
+        // 检查暂停热键冲突
+        var pauseConflict = _hotkeyService.CheckConflict(
+            AppSettings.HotkeyPauseModifier, 
+            AppSettings.HotkeyPauseKey, 
+            "Pause");
+        
+        if (pauseConflict != null && pauseConflict.IsSystemConflict)
+        {
+            OnLog($"暂停热键与系统热键冲突: {pauseConflict.Description}", 2);
+            failed.Add("暂停");
+        }
+        else if (_hotkeyService.RegisterHotkey("Pause",
             AppSettings.HotkeyPauseModifier,
             AppSettings.HotkeyPauseKey,
             () => PauseEngine()))
         {
-            registered.Add(GlobalHotkeyService.GetHotkeyDisplayText(
+            registered.Add(GlobalHotkeyService.GetHotkeyDisplayTextStatic(
                 AppSettings.HotkeyPauseModifier, AppSettings.HotkeyPauseKey));
+        }
+        else
+        {
+            failed.Add("暂停");
         }
         
         if (registered.Count > 0)
         {
             HotkeyStatus = $"快捷键: {string.Join(", ", registered)}";
             OnLog($"已注册全局快捷键: {string.Join(", ", registered)}", 1);
+        }
+        
+        if (failed.Count > 0)
+        {
+            OnLog($"以下热键注册失败: {string.Join(", ", failed)}，可能被其他程序占用", 2);
         }
     }
 
@@ -524,6 +566,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
             
             // 更新技能状态列表
             UpdateSkillStatusFromEngine(s);
+            
+            // 需求 12.5: 更新托盘图标提示
+            UpdateTrayTooltip();
         });
     }
 
@@ -613,6 +658,14 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _hotkeyService.Dispose();
         _engine.Stop();
         HideOverlay();
+        
+        // 关闭遮罩窗口
+        CloseMaskWindow();
+        
+        // 取消独立任务
+        _soloTaskCts?.Cancel();
+        _soloTaskCts?.Dispose();
+        _soloTaskCts = null;
         
         // 取消订阅配置变更事件
         _config.ConfigChanged -= OnConfigChangedHandler;
@@ -1658,10 +1711,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _config.SaveAll(); 
         OnLog("配置已保存", 1);
         
-        for (int i = 0; i < Skills.Count && i < SkillStatusList.Count; i++)
-        {
-            SkillStatusList[i].Name = Skills[i].Name;
-        }
+        // 重新初始化技能状态列表，确保与技能配置同步
+        InitializeSkillStatusList();
         
         _hasUnsavedChanges = false;
     }
@@ -1801,6 +1852,29 @@ public partial class MainViewModel : ObservableObject, IDisposable
         
         var keyCode = (uint)window.CapturedKeyCode;
         
+        // 获取当前修饰键
+        uint modifiers = hotkeyType switch
+        {
+            "StartStop" => AppSettings.HotkeyStartStopModifier,
+            "Pause" => AppSettings.HotkeyPauseModifier,
+            _ => 0
+        };
+        
+        // 检测热键冲突
+        var conflict = _hotkeyService.CheckConflict(modifiers, keyCode, hotkeyType);
+        if (conflict != null)
+        {
+            ToastManager.Warning($"热键冲突: {conflict.Description}", "热键冲突");
+            OnLog($"热键冲突: {conflict.Description}", 2);
+            
+            // 如果是系统热键冲突，建议用户更换
+            if (conflict.IsSystemConflict)
+            {
+                ToastManager.Info("建议使用其他按键组合避免与系统热键冲突", "提示");
+            }
+            return;
+        }
+        
         switch (hotkeyType)
         {
             case "StartStop":
@@ -1813,6 +1887,14 @@ public partial class MainViewModel : ObservableObject, IDisposable
         
         OnLog($"设置快捷键 [{hotkeyType}]: {window.CapturedKeyName}", 1);
         OnPropertyChanged(nameof(AppSettings));
+    }
+
+    /// <summary>
+    /// 检查热键冲突（供外部调用）
+    /// </summary>
+    public HotkeyConflict? CheckHotkeyConflict(uint modifiers, uint key, string? excludeName = null)
+    {
+        return _hotkeyService.CheckConflict(modifiers, key, excludeName);
     }
 
     #endregion
@@ -1862,6 +1944,314 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand] private void RefreshProfilesCommand() => RefreshProfiles();
     [RelayCommand] private void ClearLogs() => LogMessages.Clear();
     [RelayCommand] private void ForceCleanup() { GC.Collect(); GC.WaitForPendingFinalizers(); GC.Collect(); OnLog("内存已清理", 1); }
+
+    #region 独立任务相关 (需求 19.1, 20.1)
+    
+    /// <summary>
+    /// 是否有独立任务正在运行
+    /// </summary>
+    [ObservableProperty] private bool _isSoloTaskRunning;
+    
+    /// <summary>
+    /// 是否正在运行自动秘境任务
+    /// </summary>
+    [ObservableProperty] private bool _isAutoDomainRunning;
+    
+    /// <summary>
+    /// 是否正在运行地图追踪任务
+    /// </summary>
+    [ObservableProperty] private bool _isPathingRunning;
+    
+    private CancellationTokenSource? _soloTaskCts;
+    
+    #endregion
+    
+    #region 遮罩窗口相关 (需求 21.1)
+    
+    private MaskWindow? _maskWindow;
+    
+    /// <summary>
+    /// 遮罩窗口是否已显示
+    /// </summary>
+    [ObservableProperty] private bool _isMaskWindowVisible;
+    
+    /// <summary>
+    /// 遮罩窗口按钮文本
+    /// </summary>
+    public string MaskWindowButtonText => IsMaskWindowVisible ? "隐藏遮罩窗口" : "显示遮罩窗口";
+    
+    partial void OnIsMaskWindowVisibleChanged(bool value)
+    {
+        OnPropertyChanged(nameof(MaskWindowButtonText));
+    }
+    
+    /// <summary>
+    /// 切换遮罩窗口显示状态
+    /// 需求: 21.1
+    /// </summary>
+    [RelayCommand]
+    private void ToggleMaskWindow()
+    {
+        if (!AppSettings.EnableMaskWindow)
+        {
+            ToastManager.Warning("请先启用遮罩窗口", "遮罩窗口");
+            return;
+        }
+        
+        if (_maskWindow == null || !_maskWindow.IsExist())
+        {
+            ShowMaskWindow();
+        }
+        else
+        {
+            HideMaskWindow();
+        }
+    }
+    
+    /// <summary>
+    /// 显示遮罩窗口
+    /// </summary>
+    private void ShowMaskWindow()
+    {
+        try
+        {
+            if (_maskWindow == null)
+            {
+                _maskWindow = new MaskWindow();
+                
+                // 配置遮罩窗口
+                _maskWindow.Config.ShowLogBox = AppSettings.MaskShowLogBox;
+                _maskWindow.Config.ShowStatus = AppSettings.MaskShowStatus;
+                _maskWindow.Config.DirectionsEnabled = AppSettings.MaskDirectionsEnabled;
+                _maskWindow.Config.UidCoverEnabled = AppSettings.MaskUidCoverEnabled;
+                _maskWindow.Config.ShowFps = AppSettings.MaskShowFps;
+                _maskWindow.Config.UseSubform = AppSettings.MaskUseSubform;
+                _maskWindow.Config.TextOpacity = AppSettings.MaskTextOpacity;
+                _maskWindow.Config.LogBoxLeft = AppSettings.MaskLogBoxLeft;
+                _maskWindow.Config.LogBoxTop = AppSettings.MaskLogBoxTop;
+                _maskWindow.Config.LogBoxWidth = AppSettings.MaskLogBoxWidth;
+                _maskWindow.Config.LogBoxHeight = AppSettings.MaskLogBoxHeight;
+            }
+            
+            _maskWindow.Show();
+            IsMaskWindowVisible = true;
+            OnLog("遮罩窗口已显示", 1);
+        }
+        catch (Exception ex)
+        {
+            OnLog($"显示遮罩窗口失败: {ex.Message}", 2);
+            ToastManager.Error($"显示失败: {ex.Message}", "遮罩窗口");
+        }
+    }
+    
+    /// <summary>
+    /// 隐藏遮罩窗口
+    /// </summary>
+    private void HideMaskWindow()
+    {
+        try
+        {
+            if (_maskWindow != null)
+            {
+                // 保存遮罩窗口配置
+                AppSettings.MaskLogBoxLeft = _maskWindow.Config.LogBoxLeft;
+                AppSettings.MaskLogBoxTop = _maskWindow.Config.LogBoxTop;
+                AppSettings.MaskLogBoxWidth = _maskWindow.Config.LogBoxWidth;
+                AppSettings.MaskLogBoxHeight = _maskWindow.Config.LogBoxHeight;
+                
+                _maskWindow.Hide();
+            }
+            IsMaskWindowVisible = false;
+            OnLog("遮罩窗口已隐藏", 1);
+        }
+        catch (Exception ex)
+        {
+            OnLog($"隐藏遮罩窗口失败: {ex.Message}", 2);
+        }
+    }
+    
+    /// <summary>
+    /// 关闭遮罩窗口（释放资源）
+    /// </summary>
+    private void CloseMaskWindow()
+    {
+        try
+        {
+            if (_maskWindow != null)
+            {
+                // 保存遮罩窗口配置
+                AppSettings.MaskLogBoxLeft = _maskWindow.Config.LogBoxLeft;
+                AppSettings.MaskLogBoxTop = _maskWindow.Config.LogBoxTop;
+                AppSettings.MaskLogBoxWidth = _maskWindow.Config.LogBoxWidth;
+                AppSettings.MaskLogBoxHeight = _maskWindow.Config.LogBoxHeight;
+                
+                _maskWindow.Close();
+                _maskWindow = null;
+            }
+            IsMaskWindowVisible = false;
+        }
+        catch (Exception ex)
+        {
+            OnLog($"关闭遮罩窗口失败: {ex.Message}", 2);
+        }
+    }
+    
+    #endregion
+    
+    /// <summary>
+    /// 启动自动秘境任务
+    /// 需求: 19.1
+    /// </summary>
+    [RelayCommand]
+    private async Task StartAutoDomain()
+    {
+        if (IsSoloTaskRunning)
+        {
+            ToastManager.Warning("已有任务正在运行", "任务冲突");
+            return;
+        }
+        
+        if (!ValidateSelectedWindow())
+        {
+            return;
+        }
+        
+        IsSoloTaskRunning = true;
+        IsAutoDomainRunning = true;
+        _soloTaskCts = new CancellationTokenSource();
+        
+        OnLog("自动秘境任务已启动", 1);
+        ToastManager.Info("自动秘境任务已启动", "独立任务");
+        
+        try
+        {
+            // 获取自动秘境任务实例并执行
+            var autoDomainTask = App.GetService<Core.GameTask.Tasks.AutoDomainTask>();
+            if (autoDomainTask != null)
+            {
+                await autoDomainTask.Start(_soloTaskCts.Token);
+            }
+            else
+            {
+                OnLog("自动秘境任务服务未注册", 2);
+                ToastManager.Error("自动秘境任务服务未注册", "任务错误");
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            OnLog("自动秘境任务已取消", 1);
+            ToastManager.Info("自动秘境任务已取消", "独立任务");
+        }
+        catch (Exception ex)
+        {
+            OnLog($"自动秘境任务异常: {ex.Message}", 2);
+            ToastManager.Error($"任务异常: {ex.Message}", "独立任务");
+        }
+        finally
+        {
+            IsSoloTaskRunning = false;
+            IsAutoDomainRunning = false;
+            _soloTaskCts?.Dispose();
+            _soloTaskCts = null;
+            OnLog("自动秘境任务已结束", 1);
+        }
+    }
+    
+    /// <summary>
+    /// 启动地图追踪任务
+    /// 需求: 20.1
+    /// </summary>
+    [RelayCommand]
+    private async Task StartPathing()
+    {
+        if (IsSoloTaskRunning)
+        {
+            ToastManager.Warning("已有任务正在运行", "任务冲突");
+            return;
+        }
+        
+        if (!ValidateSelectedWindow())
+        {
+            return;
+        }
+        
+        // 选择路径文件
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "选择路径文件",
+            Filter = "JSON 文件 (*.json)|*.json|所有文件 (*.*)|*.*",
+            InitialDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "paths")
+        };
+        
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+        
+        IsSoloTaskRunning = true;
+        IsPathingRunning = true;
+        _soloTaskCts = new CancellationTokenSource();
+        
+        OnLog($"地图追踪任务已启动: {Path.GetFileName(dialog.FileName)}", 1);
+        ToastManager.Info("地图追踪任务已启动", "独立任务");
+        
+        try
+        {
+            // 获取地图追踪服务并执行
+            var pathingService = App.GetService<Core.Pathing.PathingService>();
+            if (pathingService != null)
+            {
+                // 加载路径文件
+                var pathData = pathingService.LoadPath(dialog.FileName);
+                if (pathData != null)
+                {
+                    await pathingService.StartTrackingAsync(pathData, _soloTaskCts.Token);
+                }
+                else
+                {
+                    OnLog("路径文件加载失败", 2);
+                    ToastManager.Error("路径文件加载失败", "任务错误");
+                }
+            }
+            else
+            {
+                OnLog("地图追踪服务未注册", 2);
+                ToastManager.Error("地图追踪服务未注册", "任务错误");
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            OnLog("地图追踪任务已取消", 1);
+            ToastManager.Info("地图追踪任务已取消", "独立任务");
+        }
+        catch (Exception ex)
+        {
+            OnLog($"地图追踪任务异常: {ex.Message}", 2);
+            ToastManager.Error($"任务异常: {ex.Message}", "独立任务");
+        }
+        finally
+        {
+            IsSoloTaskRunning = false;
+            IsPathingRunning = false;
+            _soloTaskCts?.Dispose();
+            _soloTaskCts = null;
+            OnLog("地图追踪任务已结束", 1);
+        }
+    }
+    
+    /// <summary>
+    /// 停止当前独立任务
+    /// </summary>
+    [RelayCommand]
+    private void StopSoloTask()
+    {
+        if (_soloTaskCts != null && !_soloTaskCts.IsCancellationRequested)
+        {
+            _soloTaskCts.Cancel();
+            OnLog("正在停止独立任务...", 1);
+            ToastManager.Info("正在停止任务...", "独立任务");
+        }
+    }
 
     [RelayCommand]
     private void CreateProfile()
@@ -2078,6 +2468,239 @@ public partial class MainViewModel : ObservableObject, IDisposable
             InputDriverType.GhostBox => "GhostBox (硬件驱动)",
             _ => driverType.ToString()
         };
+    }
+    
+    #endregion
+    
+    #region 主窗口 UI 重构相关属性和命令 (需求 7)
+    
+    /// <summary>
+    /// 托盘图标工具提示
+    /// 需求: 12.4, 12.5 - 显示引擎状态工具提示，状态变化时更新
+    /// </summary>
+    public string TrayTooltip
+    {
+        get
+        {
+            var status = IsRunning 
+                ? (IsPaused ? "已暂停" : "运行中") 
+                : "已停止";
+            
+            var tooltip = $"ShineProCS - {status}";
+            
+            // 如果正在运行，显示更多信息
+            if (IsRunning && !IsPaused)
+            {
+                tooltip += $"\n执行次数: {ExecutionCount}";
+                if (AvgResponseTime > 0)
+                    tooltip += $"\n平均响应: {AvgResponseTime:F1}ms";
+            }
+            
+            return tooltip;
+        }
+    }
+    
+    /// <summary>
+    /// 托盘图标状态（用于可能的图标切换）
+    /// 需求: 12.5
+    /// </summary>
+    public string TrayIconStatus => IsRunning 
+        ? (IsPaused ? "Paused" : "Running") 
+        : "Stopped";
+    
+    /// <summary>
+    /// 截图方式索引 (0=WGC, 1=BitBlt)
+    /// 需求: 3.6
+    /// </summary>
+    public int CaptureModeIndex
+    {
+        get => AppSettings.EnableWgcCapture ? 0 : 1;
+        set
+        {
+            AppSettings.EnableWgcCapture = value == 0;
+            OnPropertyChanged();
+        }
+    }
+    
+    #region 触发器配置属性 (需求 17.3, 18.5)
+    
+    /// <summary>
+    /// 自动拾取白名单文本（每行一个物品名称）
+    /// 需求: 17.3
+    /// </summary>
+    public string AutoPickWhitelistText
+    {
+        get => string.Join(Environment.NewLine, AppSettings.AutoPickWhitelist);
+        set
+        {
+            AppSettings.AutoPickWhitelist.Clear();
+            foreach (var line in value.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                var trimmed = line.Trim();
+                if (!string.IsNullOrEmpty(trimmed))
+                    AppSettings.AutoPickWhitelist.Add(trimmed);
+            }
+            OnPropertyChanged();
+        }
+    }
+    
+    /// <summary>
+    /// 自动拾取黑名单文本（每行一个物品名称）
+    /// 需求: 17.3
+    /// </summary>
+    public string AutoPickBlacklistText
+    {
+        get => string.Join(Environment.NewLine, AppSettings.AutoPickBlacklist);
+        set
+        {
+            AppSettings.AutoPickBlacklist.Clear();
+            foreach (var line in value.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                var trimmed = line.Trim();
+                if (!string.IsNullOrEmpty(trimmed))
+                    AppSettings.AutoPickBlacklist.Add(trimmed);
+            }
+            OnPropertyChanged();
+        }
+    }
+    
+    /// <summary>
+    /// 自动剧情跳过是否使用 OCR（与模板匹配互斥）
+    /// 需求: 18.5
+    /// </summary>
+    public bool AutoSkipUseOcr
+    {
+        get => !AppSettings.AutoSkipUseTemplateMatch;
+        set
+        {
+            AppSettings.AutoSkipUseTemplateMatch = !value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(AppSettings.AutoSkipUseTemplateMatch));
+        }
+    }
+    
+    #endregion
+    
+    /// <summary>
+    /// 切换主题命令
+    /// 需求: 1.6
+    /// </summary>
+    [RelayCommand]
+    private void SwitchTheme()
+    {
+        // 切换深浅主题
+        var currentTheme = Wpf.Ui.Appearance.ApplicationThemeManager.GetAppTheme();
+        var newTheme = currentTheme == Wpf.Ui.Appearance.ApplicationTheme.Dark 
+            ? Wpf.Ui.Appearance.ApplicationTheme.Light 
+            : Wpf.Ui.Appearance.ApplicationTheme.Dark;
+        
+        Wpf.Ui.Appearance.ApplicationThemeManager.Apply(newTheme);
+        OnLog($"主题已切换为: {newTheme}", 1);
+    }
+    
+    /// <summary>
+    /// 最小化到托盘命令
+    /// 需求: 1.6
+    /// </summary>
+    [RelayCommand]
+    private void MinimizeToTray()
+    {
+        System.Windows.Application.Current?.MainWindow?.Hide();
+    }
+    
+    /// <summary>
+    /// 显示窗口命令
+    /// 需求: 12.2
+    /// </summary>
+    [RelayCommand]
+    private void ShowWindow()
+    {
+        var mainWindow = System.Windows.Application.Current?.MainWindow;
+        if (mainWindow != null)
+        {
+            mainWindow.Show();
+            mainWindow.WindowState = System.Windows.WindowState.Normal;
+            mainWindow.Activate();
+        }
+    }
+    
+    /// <summary>
+    /// 切换引擎状态命令（用于托盘菜单）
+    /// 需求: 12.3
+    /// </summary>
+    [RelayCommand]
+    private void ToggleEngine()
+    {
+        if (IsRunning)
+            StopEngine();
+        else
+            StartEngine();
+    }
+    
+    /// <summary>
+    /// 退出应用程序命令
+    /// 需求: 12.3
+    /// </summary>
+    [RelayCommand]
+    private void Exit()
+    {
+        // 停止引擎
+        if (IsRunning)
+            StopEngine();
+        
+        // 释放资源
+        Dispose();
+        
+        // 退出应用程序
+        System.Windows.Application.Current?.Shutdown();
+    }
+    
+    /// <summary>
+    /// 检查更新命令
+    /// 需求: 12.3
+    /// </summary>
+    [RelayCommand]
+    private void CheckUpdate()
+    {
+        try
+        {
+            // 打开 GitHub 发布页面（简单实现）
+            var url = "https://github.com/ShineProCS/releases";
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = url,
+                UseShellExecute = true
+            });
+            OnLog("已打开更新页面", 1);
+            ToastManager.Info("已打开更新页面，请在浏览器中查看最新版本", "检查更新");
+        }
+        catch (Exception ex)
+        {
+            OnLog($"打开更新页面失败: {ex.Message}", 2);
+            ToastManager.Error($"打开更新页面失败: {ex.Message}", "检查更新");
+        }
+    }
+    
+    /// <summary>
+    /// 保存设置命令
+    /// 需求: 6.4
+    /// </summary>
+    [RelayCommand]
+    private void SaveSettings()
+    {
+        _config.SaveAppSettings();
+        OnLog("设置已保存", 1);
+        ToastManager.Success("设置已保存", "保存");
+    }
+    
+    /// <summary>
+    /// 更新托盘提示和状态
+    /// 需求: 12.4, 12.5
+    /// </summary>
+    private void UpdateTrayTooltip()
+    {
+        OnPropertyChanged(nameof(TrayTooltip));
+        OnPropertyChanged(nameof(TrayIconStatus));
     }
     
     #endregion

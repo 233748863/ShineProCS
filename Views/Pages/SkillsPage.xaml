@@ -1,0 +1,19 @@
+<Page x:Class="ShineProCS.Views.Pages.SkillsPage"
+         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+         xmlns:local="clr-namespace:ShineProCS.Views"
+         Title="技能配置"
+         ui:Design.Background="{DynamicResource ApplicationBackgroundBrush}"
+         ui:Design.Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+         Foreground="{DynamicResource TextFillColorPrimaryBrush}">
+    
+    <!-- 
+    需求 4: 技能配置页
+    需求 13.3: 使用统一的页面边距
+    -->
+    
+    <Grid Margin="{StaticResource PageMargin}">
+        <local:SkillConfigPage x:Name="SkillConfigPageControl"/>
+    </Grid>
+</Page>

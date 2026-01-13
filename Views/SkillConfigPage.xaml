@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
              xmlns:utils="clr-namespace:ShineProCS.Utils"
+             xmlns:dd="urn:gong-wpf-dragdrop"
              xmlns:local="clr-namespace:ShineProCS.Views">
     
     <UserControl.Resources>
@@ -12,6 +13,9 @@
     </UserControl.Resources>
     
     <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="380"/>
             <ColumnDefinition Width="*"/>
@@ -19,9 +23,15 @@
         
         <!-- 左侧：技能卡片列表 -->
         <ui:Card Margin="0,0,16,0">
-            <DockPanel>
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                
                 <!-- 顶部工具栏 -->
-                <StackPanel DockPanel.Dock="Top">
+                <StackPanel Grid.Row="0">
                     <DockPanel Margin="0,0,0,12">
                         <TextBlock Text="技能配置" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center"/>
                         <ui:Button x:Name="BtnPreset" Content="预设" Height="28" HorizontalAlignment="Right" ToolTip="加载配置预设" Click="LoadPreset_Click"/>
@@ -52,15 +62,13 @@
                     </Grid>
                 </StackPanel>
                 
-                <!-- 底部保存按钮 -->
-                <StackPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
-                    <ui:Button x:Name="BtnSave" Content="💾 保存配置" Appearance="Primary" Height="40" HorizontalAlignment="Stretch" Click="SaveConfig_Click"/>
-                    <TextBlock x:Name="UnsavedHint" Text="* 有未保存的更改" Foreground="#FF9800" FontSize="11" HorizontalAlignment="Center" Margin="0,4,0,0" Visibility="Collapsed"/>
-                </StackPanel>
-                
-                <!-- 技能卡片列表 -->
-                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,8">
-                    <ItemsControl x:Name="SkillCardList" ItemsSource="{Binding Skills}">
+                <!-- 技能卡片列表 - 支持拖拽排序，放在中间行以填充剩余空间 -->
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="0,8">
+                    <ItemsControl x:Name="SkillCardList" ItemsSource="{Binding Skills}"
+                                  dd:DragDrop.IsDragSource="True"
+                                  dd:DragDrop.IsDropTarget="True"
+                                  dd:DragDrop.UseDefaultDragAdorner="True"
+                                  dd:DragDrop.DropHandler="{Binding RelativeSource={RelativeSource AncestorType=UserControl}}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
                                 <local:SkillCardControl x:Name="SkillCard" Loaded="SkillCard_Loaded"/>
@@ -68,7 +76,13 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
                 </ScrollViewer>
-            </DockPanel>
+                
+                <!-- 底部保存按钮 -->
+                <StackPanel Grid.Row="2" Margin="0,8,0,0">
+                    <ui:Button x:Name="BtnSave" Content="💾 保存配置" Appearance="Primary" Height="40" HorizontalAlignment="Stretch" Click="SaveConfig_Click"/>
+                    <TextBlock x:Name="UnsavedHint" Text="* 有未保存的更改" Foreground="#FF9800" FontSize="11" HorizontalAlignment="Center" Margin="0,4,0,0" Visibility="Collapsed"/>
+                </StackPanel>
+            </Grid>
         </ui:Card>
         
         <!-- 右侧：实时预览和帮助 -->

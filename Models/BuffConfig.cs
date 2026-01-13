@@ -49,6 +49,21 @@ public partial class BuffConfig : ObservableObject
     [ObservableProperty] private bool _enabled = true;
     
     /// <summary>
+    /// 被技能引用的次数（运行时计算，不序列化）
+    /// 需求 5.4: 显示引用计数
+    /// </summary>
+    [ObservableProperty] 
+    [property: System.Text.Json.Serialization.JsonIgnore]
+    private int _referenceCount;
+    
+    /// <summary>
+    /// 引用此Buff的技能名称列表（运行时计算，不序列化）
+    /// </summary>
+    [ObservableProperty]
+    [property: System.Text.Json.Serialization.JsonIgnore]
+    private List<string> _referencingSkills = [];
+    
+    /// <summary>
     /// 检查是否已配置检测区域
     /// </summary>
     public bool HasRegion => IconRegion.Any(v => v > 0);
@@ -62,4 +77,14 @@ public partial class BuffConfig : ObservableObject
     /// 配置状态文本
     /// </summary>
     public string ConfigStatus => HasRegion && HasTemplate ? "✓ 已配置" : HasRegion ? "⚠ 缺少模板" : "⚠ 未配置";
+    
+    /// <summary>
+    /// 是否有引用（用于UI绑定）
+    /// </summary>
+    public bool HasReferences => ReferenceCount > 0;
+    
+    /// <summary>
+    /// 是否已完全配置（有区域和模板）
+    /// </summary>
+    public bool IsConfigured => HasRegion && HasTemplate;
 }

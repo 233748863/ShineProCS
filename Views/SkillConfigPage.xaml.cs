@@ -5,6 +5,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 using System.Windows.Threading;
+using GongSolutions.Wpf.DragDrop;
 using OpenCvSharp;
 using ShineProCS.Core.Interfaces;
 using ShineProCS.Core.Services;
@@ -15,13 +16,14 @@ using Brushes = System.Windows.Media.Brushes;
 using Color = System.Windows.Media.Color;
 using Rectangle = System.Windows.Shapes.Rectangle;
 using MessageBox = System.Windows.MessageBox;
+using IDropTarget = GongSolutions.Wpf.DragDrop.IDropTarget;
 
 namespace ShineProCS.Views;
 
 /// <summary>
-/// 技能配置页面 - 卡片式布局 + 实时预览
+/// 技能配置页面 - 卡片式布局 + 实时预览 + 拖拽排序
 /// </summary>
-public partial class SkillConfigPage : System.Windows.Controls.UserControl
+public partial class SkillConfigPage : System.Windows.Controls.UserControl, IDropTarget
 {
     private MainViewModel? _viewModel;
     private IImageInterface? _imageInterface;
@@ -727,6 +729,49 @@ public partial class SkillConfigPage : System.Windows.Controls.UserControl
     private void MarkUnsaved() 
     { 
         UnsavedHint.Visibility = Visibility.Visible; 
+    }
+
+    #endregion
+
+    #region IDropTarget 实现 - 拖拽排序
+
+    /// <summary>
+    /// 拖拽悬停时的处理 - 验证是否可以放置
+    /// </summary>
+    void IDropTarget.DragOver(IDropInfo dropInfo)
+    {
+        if (dropInfo.Data is SkillConfig && dropInfo.TargetItem is SkillConfig)
+        {
+            dropInfo.DropTargetAdorner = DropTargetAdorners.Insert;
+            dropInfo.Effects = System.Windows.DragDropEffects.Move;
+        }
+    }
+
+    /// <summary>
+    /// 放置时的处理 - 执行排序
+    /// </summary>
+    void IDropTarget.Drop(IDropInfo dropInfo)
+    {
+        if (_viewModel == null) return;
+        
+        if (dropInfo.Data is SkillConfig sourceItem && dropInfo.TargetItem is SkillConfig)
+        {
+            var sourceIndex = _viewModel.Skills.IndexOf(sourceItem);
+            var targetIndex = dropInfo.InsertIndex;
+            
+            // 如果目标位置在源位置之后，需要调整索引
+            if (sourceIndex < targetIndex)
+            {
+                targetIndex--;
+            }
+            
+            if (sourceIndex != targetIndex && sourceIndex >= 0 && targetIndex >= 0)
+            {
+                _viewModel.Skills.Move(sourceIndex, targetIndex);
+                MarkUnsaved();
+                ToastManager.Info($"已移动技能 [{sourceItem.Name}]", "排序");
+            }
+        }
     }
 
     #endregion
