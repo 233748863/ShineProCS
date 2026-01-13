@@ -144,7 +144,7 @@
                             Visibility="{Binding IsGhostBoxAvailable, Converter={StaticResource InvBoolToVis}}">
                         <StackPanel Orientation="Horizontal">
                             <ui:SymbolIcon Symbol="Warning24" Foreground="{StaticResource ErrorBrush}" Margin="0,0,8,0"/>
-                            <TextBlock Text="GhostBox DLL 未找到，请将 gbild32.dll 和 gbild64.dll 放入 libs/ghostbox/ 目录" 
+                            <TextBlock Text="GhostBox DLL 未找到，请将 gbild64.dll 放入 libs/ghostbox/ 目录" 
                                        Foreground="{StaticResource ErrorBrush}" TextWrapping="Wrap"/>
                         </StackPanel>
                     </Border>
@@ -357,130 +357,6 @@
                 </StackPanel>
             </ui:Card>
             
-            <!-- 需求 17.1, 17.3, 18.5: 触发器配置 -->
-            <ui:Card Margin="{StaticResource CardMargin}">
-                <StackPanel>
-                    <TextBlock Text="触发器配置" Style="{StaticResource SectionTitleStyle}"/>
-                    <TextBlock Text="配置自动触发器的启用状态和参数" Style="{StaticResource SecondaryTextStyle}" Margin="{StaticResource SectionMargin}"/>
-                    
-                    <!-- 自动拾取配置 -->
-                    <Border Style="{StaticResource InfoPanelStyle}" Margin="{StaticResource SectionMargin}">
-                        <StackPanel>
-                            <StackPanel Orientation="Horizontal" Margin="{StaticResource SmallMargin}">
-                                <ui:SymbolIcon Symbol="HandRight24" Margin="0,0,8,0"/>
-                                <TextBlock Text="自动拾取" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                <ui:ToggleSwitch IsChecked="{Binding AppSettings.EnableAutoPick}" Margin="16,0,0,0"/>
-                            </StackPanel>
-                            <TextBlock Text="检测到可拾取物品时自动按 F 键拾取" Style="{StaticResource HintTextStyle}"/>
-                            
-                            <!-- 自动拾取详细配置 -->
-                            <StackPanel Visibility="{Binding AppSettings.EnableAutoPick, Converter={StaticResource BoolToVis}}" Margin="0,8,0,0">
-                                <Grid Margin="{StaticResource SmallMargin}">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="100"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="触发间隔" VerticalAlignment="Center"/>
-                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
-                                        <ui:TextBox Text="{Binding AppSettings.AutoPickInterval, UpdateSourceTrigger=PropertyChanged}" 
-                                                    Width="80" PreviewTextInput="NumericTextBox_PreviewTextInput"/>
-                                        <TextBlock Text="毫秒" VerticalAlignment="Center" Margin="8,0,0,0" Foreground="{StaticResource TextSecondaryBrush}"/>
-                                    </StackPanel>
-                                </Grid>
-                                
-                                <Grid Margin="{StaticResource SmallMargin}">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="100"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="置信度阈值" VerticalAlignment="Center"/>
-                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
-                                        <ui:TextBox Text="{Binding AppSettings.AutoPickConfidenceThreshold, UpdateSourceTrigger=PropertyChanged, StringFormat=F2}" 
-                                                    Width="80"/>
-                                        <TextBlock Text="(0.0-1.0)" VerticalAlignment="Center" Margin="8,0,0,0" Foreground="{StaticResource TextSecondaryBrush}"/>
-                                    </StackPanel>
-                                </Grid>
-                                
-                                <!-- 白名单配置 -->
-                                <Expander Header="白名单配置（为空时拾取所有）" Margin="0,8,0,0">
-                                    <StackPanel Margin="0,8,0,0">
-                                        <TextBlock Text="每行一个物品名称，留空表示拾取所有物品" Style="{StaticResource HintTextStyle}"/>
-                                        <ui:TextBox x:Name="AutoPickWhitelistTextBox" 
-                                                    Text="{Binding AutoPickWhitelistText, UpdateSourceTrigger=LostFocus}"
-                                                    AcceptsReturn="True" TextWrapping="Wrap" Height="80" Margin="0,4,0,0"/>
-                                    </StackPanel>
-                                </Expander>
-                                
-                                <!-- 黑名单配置 -->
-                                <Expander Header="黑名单配置" Margin="0,4,0,0">
-                                    <StackPanel Margin="0,8,0,0">
-                                        <TextBlock Text="每行一个物品名称，匹配的物品将不会被拾取" Style="{StaticResource HintTextStyle}"/>
-                                        <ui:TextBox x:Name="AutoPickBlacklistTextBox" 
-                                                    Text="{Binding AutoPickBlacklistText, UpdateSourceTrigger=LostFocus}"
-                                                    AcceptsReturn="True" TextWrapping="Wrap" Height="80" Margin="0,4,0,0"/>
-                                    </StackPanel>
-                                </Expander>
-                            </StackPanel>
-                        </StackPanel>
-                    </Border>
-                    
-                    <!-- 自动剧情跳过配置 -->
-                    <Border Style="{StaticResource InfoPanelStyle}" Margin="{StaticResource SectionMargin}">
-                        <StackPanel>
-                            <StackPanel Orientation="Horizontal" Margin="{StaticResource SmallMargin}">
-                                <ui:SymbolIcon Symbol="FastForward24" Margin="0,0,8,0"/>
-                                <TextBlock Text="自动剧情跳过" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                <ui:ToggleSwitch IsChecked="{Binding AppSettings.EnableAutoSkip}" Margin="16,0,0,0"/>
-                            </StackPanel>
-                            <TextBlock Text="检测到对话框时自动点击跳过或继续" Style="{StaticResource HintTextStyle}"/>
-                            
-                            <!-- 自动剧情跳过详细配置 -->
-                            <StackPanel Visibility="{Binding AppSettings.EnableAutoSkip, Converter={StaticResource BoolToVis}}" Margin="0,8,0,0">
-                                <Grid Margin="{StaticResource SmallMargin}">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="100"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="触发间隔" VerticalAlignment="Center"/>
-                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
-                                        <ui:TextBox Text="{Binding AppSettings.AutoSkipInterval, UpdateSourceTrigger=PropertyChanged}" 
-                                                    Width="80" PreviewTextInput="NumericTextBox_PreviewTextInput"/>
-                                        <TextBlock Text="毫秒" VerticalAlignment="Center" Margin="8,0,0,0" Foreground="{StaticResource TextSecondaryBrush}"/>
-                                    </StackPanel>
-                                </Grid>
-                                
-                                <Grid Margin="{StaticResource SmallMargin}">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="100"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="选项模式" VerticalAlignment="Center"/>
-                                    <ComboBox Grid.Column="1" SelectedIndex="{Binding AppSettings.AutoSkipOptionMode}" Width="150" HorizontalAlignment="Left">
-                                        <ComboBoxItem Content="选择第一个选项"/>
-                                        <ComboBoxItem Content="选择最后一个选项"/>
-                                        <ComboBoxItem Content="随机选择"/>
-                                    </ComboBox>
-                                </Grid>
-                                
-                                <Grid Margin="{StaticResource SmallMargin}">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="100"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="检测方式" VerticalAlignment="Center"/>
-                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
-                                        <RadioButton Content="OCR文字识别" IsChecked="{Binding AutoSkipUseOcr}" Margin="0,0,16,0"/>
-                                        <RadioButton Content="模板匹配" IsChecked="{Binding AppSettings.AutoSkipUseTemplateMatch}"/>
-                                    </StackPanel>
-                                </Grid>
-                                
-                                <ui:ToggleSwitch IsChecked="{Binding AppSettings.AutoSkipRunBackground}" 
-                                                 Content="后台运行模式（窗口失去焦点时继续）" Margin="0,4,0,0"/>
-                            </StackPanel>
-                        </StackPanel>
-                    </Border>
-                </StackPanel>
-            </ui:Card>
             
             <!-- 需求 6.5: 配置导入导出 -->
             <!-- 需求 13.5: 使用 SymbolIcon 作为按钮图标 -->

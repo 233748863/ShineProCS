@@ -5,10 +5,8 @@ using Microsoft.Extensions.Hosting;
 using Serilog;
 using ShineProCS.Core.Config;
 using ShineProCS.Core.Engine;
-using ShineProCS.Core.GameTask.Tasks;
-using ShineProCS.Core.GameTask.Triggers;
+
 using ShineProCS.Core.Interfaces;
-using ShineProCS.Core.Pathing;
 using ShineProCS.Core.Recognition.OCR;
 using ShineProCS.Core.Recognition.OCR.Paddle;
 using ShineProCS.Core.Recognition.ONNX;
@@ -180,8 +178,6 @@ public partial class App : System.Windows.Application
                 
                 // ========== 触发器（单例） ==========
                 // 需求 14.6: 技能循环触发器
-                // 需求 17.1: 自动拾取触发器
-                // 需求 18.1: 自动剧情跳过触发器
                 services.AddSingleton<ShineProCS.Core.GameTask.Triggers.SkillLoopTrigger>(sp =>
                 {
                     var inputService = sp.GetRequiredService<IInputService>();
@@ -192,53 +188,6 @@ public partial class App : System.Windows.Application
                         captureService.GetImageInterface(),
                         configManager);
                 });
-                services.AddSingleton<AutoPickTrigger>(sp =>
-                {
-                    var inputService = sp.GetRequiredService<IInputService>();
-                    var ocrService = sp.GetService<IOcrService>();
-                    var configManager = sp.GetRequiredService<ConfigManager>();
-                    var logService = sp.GetRequiredService<ILogService>();
-                    return new AutoPickTrigger(inputService, ocrService, configManager, logService);
-                });
-                services.AddSingleton<AutoSkipTrigger>(sp =>
-                {
-                    var inputService = sp.GetRequiredService<IInputService>();
-                    var ocrService = sp.GetService<IOcrService>();
-                    var configManager = sp.GetRequiredService<ConfigManager>();
-                    var logService = sp.GetRequiredService<ILogService>();
-                    return new AutoSkipTrigger(inputService, ocrService, configManager, logService);
-                });
-                
-                // ========== 独立任务（瞬态） ==========
-                // 需求 19.1: 自动秘境任务
-                // 需求 20.1: 地图追踪任务
-                services.AddTransient<AutoDomainTask>(sp =>
-                {
-                    var captureService = sp.GetRequiredService<ICaptureService>();
-                    var inputService = sp.GetRequiredService<IInputService>();
-                    var logService = sp.GetRequiredService<ILogService>();
-                    var notificationService = sp.GetRequiredService<INotificationService>();
-                    var configManager = sp.GetRequiredService<ConfigManager>();
-                    var skillLoopTrigger = sp.GetService<ShineProCS.Core.GameTask.Triggers.SkillLoopTrigger>();
-                    var ocrService = sp.GetService<IOcrService>();
-                    var yoloService = sp.GetService<IYoloService>();
-                    return new AutoDomainTask(
-                        captureService, inputService, logService, notificationService,
-                        configManager, skillLoopTrigger, ocrService, yoloService);
-                });
-                services.AddTransient<PathingTask>(sp =>
-                {
-                    var captureService = sp.GetRequiredService<ICaptureService>();
-                    var inputService = sp.GetRequiredService<IInputService>();
-                    var logService = sp.GetRequiredService<ILogService>();
-                    var notificationService = sp.GetRequiredService<INotificationService>();
-                    var configManager = sp.GetRequiredService<ConfigManager>();
-                    var skillLoopTrigger = sp.GetService<ShineProCS.Core.GameTask.Triggers.SkillLoopTrigger>();
-                    return new PathingTask(
-                        captureService, inputService, logService, notificationService,
-                        configManager, skillLoopTrigger);
-                });
-                services.AddSingleton<PathingService>();
                 
                 // ========== 遮罩窗口 ==========
                 // 需求 21.1: 遮罩窗口

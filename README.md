@@ -57,9 +57,8 @@ ShineProCS/
 ├── Core/
 │   ├── Config/          # 全局配置
 │   ├── Engine/          # 技能循环引擎、任务调度器
-│   ├── GameTask/        # 游戏任务（自动拾取、自动跳过等）
+│   ├── GameTask/        # 游戏任务触发器
 │   ├── Interfaces/      # 抽象接口（服务、任务、触发器）
-│   ├── Pathing/         # 路径系统
 │   ├── Recognition/     # 识别服务（OCR、YOLO、模板匹配）
 │   ├── Services/        # 核心服务实现
 │   ├── Strategies/      # 策略模式实现

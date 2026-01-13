@@ -183,36 +183,6 @@
                 
                 <Separator Margin="0,8"/>
                 
-                <!-- 需求 19.1, 20.1: 独立任务入口 -->
-                <TextBlock Text="独立任务" FontWeight="SemiBold" FontSize="{StaticResource FontSizeSM}" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,4,0,4"/>
-                
-                <ui:Button Command="{Binding StartAutoDomainCommand}" Height="30" Margin="{StaticResource SmallMargin}" 
-                           HorizontalAlignment="Stretch" Icon="{ui:SymbolIcon Games24}"
-                           IsEnabled="{Binding IsAutoDomainRunning, Converter={StaticResource InvBool}}"
-                           Visibility="{Binding AppSettings.EnableAutoDomain, Converter={StaticResource BoolToVis}}">
-                    <ui:Button.Content>
-                        <TextBlock Text="自动秘境" Margin="4,0,0,0"/>
-                    </ui:Button.Content>
-                </ui:Button>
-                
-                <ui:Button Command="{Binding StartPathingCommand}" Height="30" Margin="{StaticResource SmallMargin}" 
-                           HorizontalAlignment="Stretch" Icon="{ui:SymbolIcon Map24}"
-                           IsEnabled="{Binding IsPathingRunning, Converter={StaticResource InvBool}}">
-                    <ui:Button.Content>
-                        <TextBlock Text="地图追踪" Margin="4,0,0,0"/>
-                    </ui:Button.Content>
-                </ui:Button>
-                
-                <ui:Button Command="{Binding StopSoloTaskCommand}" Height="30" Margin="{StaticResource SmallMargin}" 
-                           HorizontalAlignment="Stretch" Icon="{ui:SymbolIcon Dismiss24}" Appearance="Secondary"
-                           Visibility="{Binding IsSoloTaskRunning, Converter={StaticResource BoolToVis}}">
-                    <ui:Button.Content>
-                        <TextBlock Text="停止任务" Margin="4,0,0,0"/>
-                    </ui:Button.Content>
-                </ui:Button>
-                
-                <Separator Margin="0,8"/>
-                
                 <!-- 需求 21.1: 遮罩窗口控制 -->
                 <TextBlock Text="遮罩窗口" FontWeight="SemiBold" FontSize="{StaticResource FontSizeSM}" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,4,0,4"/>
                 

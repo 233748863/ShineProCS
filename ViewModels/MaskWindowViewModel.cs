@@ -113,15 +113,7 @@ public partial class MaskWindowViewModel : ObservableRecipient
     {
         StatusList.Clear();
         
-        if (AppSettings != null)
-        {
-            // 添加各功能模块的状态（与 BetterGI 一致的图标）
-            StatusList.Add(new StatusItem("🖐 拾取", AppSettings, "EnableAutoPick"));
-            StatusList.Add(new StatusItem("💬 剧情", AppSettings, "EnableAutoSkip"));
-            StatusList.Add(new StatusItem("🎣 钓鱼", AppSettings, "EnableAutoFishing"));
-            StatusList.Add(new StatusItem("📍 传送", AppSettings, "EnableQuickTeleport"));
-            StatusList.Add(new StatusItem("🏰 秘境", AppSettings, "EnableAutoDomain"));
-        }
+        // 状态列表已清空，可根据需要添加其他状态项
     }
 
     /// <summary>
