@@ -11,9 +11,11 @@
     <!-- 
     需求 5: Buff库页面
     需求 13.3: 使用统一的页面边距
+    
+    注意：使用 VerticalAlignment="Stretch" 确保内容填充整个可用高度
     -->
     
-    <Grid Margin="{StaticResource PageMargin}">
-        <local:BuffLibraryPage x:Name="BuffLibraryPageControl"/>
+    <Grid Margin="{StaticResource PageMargin}" VerticalAlignment="Stretch">
+        <local:BuffLibraryPage x:Name="BuffLibraryPageControl" VerticalAlignment="Stretch"/>
     </Grid>
 </Page>

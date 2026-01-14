@@ -2021,13 +2021,15 @@ public partial class MainViewModel : ObservableObject, IDisposable
             return;
         }
         
-        if (_maskWindow == null || !_maskWindow.IsExist())
+        // 使用 IsMaskWindowVisible 状态来判断，而不是检查窗口是否存在
+        // 因为 Hide() 后窗口仍然存在但不可见
+        if (IsMaskWindowVisible)
         {
-            ShowMaskWindow();
+            HideMaskWindow();
         }
         else
         {
-            HideMaskWindow();
+            ShowMaskWindow();
         }
     }
     

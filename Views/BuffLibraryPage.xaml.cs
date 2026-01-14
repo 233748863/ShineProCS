@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media.Imaging;
 using ShineProCS.Core.Interfaces;
 using ShineProCS.Core.Services;
@@ -34,6 +35,65 @@ public partial class BuffLibraryPage : WinUserControl
     {
         InitializeComponent();
         Loaded += OnLoaded;
+        
+        // 注册 ScrollViewer 的 Loaded 事件，用于设置 MaxHeight
+        BuffListScrollViewer.Loaded += BuffListScrollViewer_Loaded;
+    }
+    
+    /// <summary>
+    /// ScrollViewer 加载完成后设置 MaxHeight
+    /// 解决 WPF UI 库 NavigationView 内部布局导致 ScrollableHeight 为 0 的问题
+    /// </summary>
+    private void BuffListScrollViewer_Loaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is ScrollViewer sv)
+        {
+            // 获取主窗口高度
+            var mainWindow = WinApp.Current.MainWindow;
+            if (mainWindow != null && mainWindow.ActualHeight > 0)
+            {
+                // 计算允许的最大高度（窗口高度减去标题栏、工具栏等）
+                double maxAllowedHeight = mainWindow.ActualHeight - 350;
+                sv.MaxHeight = maxAllowedHeight;
+                
+                // 强制 WPF 重新计算布局
+                sv.InvalidateMeasure();
+                sv.UpdateLayout();
+            }
+            
+            // 监听窗口大小变化，动态调整 MaxHeight
+            if (mainWindow != null)
+            {
+                mainWindow.SizeChanged += (s, args) =>
+                {
+                    if (args.HeightChanged && mainWindow.ActualHeight > 0)
+                    {
+                        double newMaxHeight = mainWindow.ActualHeight - 350;
+                        sv.MaxHeight = newMaxHeight;
+                        sv.InvalidateMeasure();
+                        sv.UpdateLayout();
+                    }
+                };
+            }
+        }
+    }
+    
+    /// <summary>
+    /// 处理 Buff 列表 ScrollViewer 的滚轮事件
+    /// 防止事件冒泡到外层 NavigationView，避免整个页面滚动
+    /// </summary>
+    private void BuffListScrollViewer_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (sender is not ScrollViewer scrollViewer) return;
+        
+        // 计算滚动量并执行滚动
+        double scrollAmount = e.Delta / 3.0;
+        double newOffset = scrollViewer.VerticalOffset - scrollAmount;
+        newOffset = Math.Max(0, Math.Min(newOffset, scrollViewer.ScrollableHeight));
+        scrollViewer.ScrollToVerticalOffset(newOffset);
+        
+        // 标记事件已处理，防止冒泡到外层
+        e.Handled = true;
     }
     
     private void OnLoaded(object sender, RoutedEventArgs e)
